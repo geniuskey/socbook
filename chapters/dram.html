@@ -454,7 +454,7 @@
         ctx.fillText(f[0] + (f[0] === "뱅크" && map === "xor" ? "⊕행" : ""), (xa + xb) / 2, ly + 7);
       });
       // banks 4x4
-      var gy = by + bh + 32, sh = 30, gh = h - gy - sh - 30, gw = Math.min(w - 2 * pad, gh * 2.2), gx = (w - gw) / 2;
+      var gy = by + bh + 44, sh = 30, gh = h - gy - sh - 30, gw = Math.min(w - 2 * pad, gh * 2.2), gx = (w - gw) / 2;
       var tw = gw / 4, th = gh / 4;
       geo = { gx: gx, gy: gy, tw: tw, th: th };
       for (var b = 0; b < 16; b++) {
@@ -811,7 +811,7 @@
         var by = w < 500 ? y + (rh - bh) / 2 + 3 : y + (rh - bh) / 2;
         ctx.fillStyle = col; ctx.fillRect(x0 + a * sc, by, Math.max(1, (b - a) * sc), bh);
         ctx.fillStyle = P.text; ctx.font = SB.font(11, true, 700); ctx.textBaseline = "middle"; var tx = x0 + b * sc + 6;
-        ctx.textAlign = tx + 70 > w ? "right" : "left"; ctx.fillText(txt, tx + 70 > w ? x0 + a * sc - 6 : tx, by + bh / 2);
+        var inside = tx + 70 > w; ctx.textAlign = inside ? "right" : "left"; if (inside) ctx.fillStyle = "#fff"; ctx.fillText(txt, inside ? x0 + b * sc - 6 : tx, by + bh / 2);
       }
       row(0, "이론 최대", 0, R.peak, SOC.color("mem"), R.peak.toFixed(1) + " GB/s");
       var cur = R.peak;
