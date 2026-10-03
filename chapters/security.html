@@ -1,0 +1,449 @@
+<!doctype html>
+<!-- Copyright (c) 2026 geniuskey and SoCBook contributors.
+     Executable code: MIT (see ../LICENSE-MIT).
+     Text, illustrations, questions and explanations: CC-BY-4.0 (see ../LICENSE.md). -->
+<html lang="ko">
+<head>
+<!--head:start {"desc": "전원을 켜면 무엇이 먼저 깨어나는가. 부트 ROM에서 커널까지 이어지는 신뢰 사슬, 해시와 서명으로 펌웨어를 검증하는 보안 부팅, TrustZone 방화벽, 암호 엔진·난수·키 사다리, 부채널과 결함 주입에 대한 방어를 직접 만져 본다.", "libs": []}-->
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>부팅과 보안 · SoCBook</title>
+<meta name="description" content="전원을 켜면 무엇이 먼저 깨어나는가. 부트 ROM에서 커널까지 이어지는 신뢰 사슬, 해시와 서명으로 펌웨어를 검증하는 보안 부팅, TrustZone 방화벽, 암호 엔진·난수·키 사다리, 부채널과 결함 주입에 대한 방어를 직접 만져 본다.">
+<link rel="canonical" href="https://socbook.euiyun.com/chapters/security.html">
+<link rel="icon" type="image/svg+xml" href="../favicon.svg">
+<meta name="theme-color" content="#c8285f">
+<meta property="og:type" content="article">
+<meta property="og:site_name" content="SoCBook">
+<meta property="og:locale" content="ko_KR">
+<meta property="og:title" content="부팅과 보안 · SoCBook">
+<meta property="og:description" content="전원을 켜면 무엇이 먼저 깨어나는가. 부트 ROM에서 커널까지 이어지는 신뢰 사슬, 해시와 서명으로 펌웨어를 검증하는 보안 부팅, TrustZone 방화벽, 암호 엔진·난수·키 사다리, 부채널과 결함 주입에 대한 방어를 직접 만져 본다.">
+<meta property="og:url" content="https://socbook.euiyun.com/chapters/security.html">
+<meta property="og:image" content="https://socbook.euiyun.com/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":["Chapter","LearningResource"],"@id":"https://socbook.euiyun.com/chapters/security.html#chapter","name":"부팅과 보안","headline":"부팅과 보안 · SoCBook","description":"전원을 켜면 무엇이 먼저 깨어나는가. 부트 ROM에서 커널까지 이어지는 신뢰 사슬, 해시와 서명으로 펌웨어를 검증하는 보안 부팅, TrustZone 방화벽, 암호 엔진·난수·키 사다리, 부채널과 결함 주입에 대한 방어를 직접 만져 본다.","url":"https://socbook.euiyun.com/chapters/security.html","position":16,"inLanguage":"ko","isAccessibleForFree":true,"learningResourceType":"인터랙티브 교재","educationalLevel":"공대 학부","image":"https://socbook.euiyun.com/og.png","dateModified":"2026-10-03","isPartOf":{"@type":"Book","@id":"https://socbook.euiyun.com/#book","name":"SoCBook · 시스템 온 칩 교과서","url":"https://socbook.euiyun.com/"}},{"@type":"BreadcrumbList","itemListElement":[{"@type":"ListItem","position":1,"name":"SoCBook","item":"https://socbook.euiyun.com/"},{"@type":"ListItem","position":2,"name":"16. 부팅과 보안","item":"https://socbook.euiyun.com/chapters/security.html"}]}]}</script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+<link rel="stylesheet" href="../css/style.css">
+<script src="../js/common.js"></script>
+<script src="../js/soc.js"></script>
+<!--head:end-->
+<style>
+  .sc-steps { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+  .sc-steps button { font: inherit; font-family: var(--mono); font-size: 12px; width: 28px; height: 28px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text-dim); cursor: pointer; }
+  .sc-steps button.on { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 700; }
+  .sc-steps button.done { border-color: var(--accent); color: var(--accent); }
+  .sc-desc { margin: 0 18px 14px; }
+  .sc-log { font-family: var(--mono); font-size: 12.5px; line-height: 1.6; padding: 12px 18px; border-top: 1px solid var(--border); background: var(--surface); max-height: 260px; overflow-y: auto; overflow-wrap: anywhere; }
+  .sc-log div { padding-left: 1.2em; text-indent: -1.2em; }
+  .sc-log .ok { color: var(--ok); }
+  .sc-log .bad { color: var(--bad); font-weight: 600; }
+  .sc-log .warn { color: var(--warn); }
+  .sc-log .info { color: var(--text-dim); }
+  .sc-log .note { color: var(--accent-2); }
+  .sc-sub { font-size: 12px; color: var(--text-faint); font-weight: 700; letter-spacing: .06em; margin-bottom: 4px; display: block; }
+  .sc-bits { display: inline-flex; gap: 3px; flex-wrap: wrap; }
+  .sc-bits button { font: inherit; font-family: var(--mono); font-size: 13px; width: 30px; height: 30px; border-radius: 7px; border: 1px solid var(--border); background: var(--surface); color: var(--text-dim); cursor: pointer; }
+  .sc-bits button.on { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 700; }
+  .sc-hex { font-family: var(--mono); font-size: 12.5px; overflow-wrap: anywhere; }
+  .sc-hex b { color: var(--accent); }
+  .sc-code { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); margin: 20px 0; }
+  .sc-code pre { margin: 0; font-family: var(--mono); font-size: 12.5px; line-height: 1.55; background: var(--bg-elev); border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--text); }
+</style>
+</head>
+<body data-chapter="security">
+<main class="chapter">
+  <header class="chapter-hero">
+    <div class="eyebrow">Chapter 16</div>
+    <h1>부팅과 보안</h1>
+    <p class="lead">전원 버튼을 누르고 화면에 로고가 뜨기까지 1~2초. 그 짧은 시간 동안 칩 안에서는 릴레이 경주가 벌어진다. 전원 IC가 전압을 차례로 올리고, 리셋이 풀리면 칩 안에 새겨진 수십 KB짜리 코드가 첫 명령어를 실행한다. 이 코드는 저장장치에서 다음 주자를 불러와 <strong>"너, 정말 제조사가 만든 코드가 맞니?"</strong>라고 묻고, 맞다고 확인될 때만 바통을 넘긴다. 이 질문이 커널까지 한 번도 끊기지 않고 이어져야 휴대폰을 잃어버려도 지문과 결제 정보가 안전하다. 이 장에서는 그 릴레이를 직접 망가뜨려 보며, 칩이 무엇을 믿고 무엇을 의심하는지 배운다.</p>
+    <ul class="objectives">
+      <li>전원 인가부터 커널 실행까지의 부팅 단계와, 각 단계가 무엇을 준비하는지(전압·리셋·클럭·DRAM) 설명할 수 있다.</li>
+      <li>해시와 디지털 서명이 펌웨어의 무결성과 출처를 어떻게 보장하는지, 퓨즈에 새긴 공개키 해시가 왜 "신뢰의 뿌리"인지 이해한다.</li>
+      <li>신뢰 사슬, 롤백 방지 카운터, 복구 경로가 함께 작동하는 보안 부팅을 시뮬레이터로 확인한다.</li>
+      <li>TrustZone의 두 세계와 버스 방화벽이 메모리·주변장치 접근을 어떻게 가르는지 버스 마스터별로 따져 본다.</li>
+      <li>암호 엔진·난수 발생기·키 사다리의 역할과, 타이밍·전력·결함 주입 같은 물리 공격에 대한 설계 대책을 안다.</li>
+    </ul>
+    <div class="soc-locator" data-blocks="sec pmu" data-caption="이 장의 주인공은 왼쪽 아래의 보안 엔클레이브(부트 ROM·암호 엔진·키 저장소)와, 부팅 순서를 지휘하는 전력·클럭 관리 블록이다."></div>
+  </header>
+
+  <!-- ============================================================ 1 -->
+  <section id="power-on">
+    <h2>전원 버튼에서 첫 명령어까지</h2>
+    <p>CPU는 전원이 들어오자마자 코드를 실행할 수 없다. 먼저 <strong>전압</strong>이 안정되어야 하고, 플립플롭들이 정해진 값에서 출발하도록 <strong>리셋</strong>이 걸려 있다가 풀려야 하고, 일정한 <strong>클럭</strong>이 있어야 한다. 그리고 실행할 코드는 어딘가 이미 존재해야 한다. 그런데 DRAM은 전원이 꺼지면 내용을 잃고, 쓸 수 있게 되기까지 복잡한 초기화가 필요하다. 그래서 SoC의 첫 코드는 칩 안에 제조 단계에서 새겨 넣은 <span class="term">부트 ROM</span><span class="en">(Boot ROM, Mask ROM)</span>에 있다.</p>
+    <p>전원 관리 IC<span class="en">(PMIC)</span>는 정해진 순서대로 전압 레일을 올린다. 항상 켜져 있어야 하는 영역<span class="en">(Always-on)</span>이 가장 먼저, 그다음 메모리·코어·I/O 레일이 차례로 올라온다. 순서가 어긋나면 입출력 회로의 보호 다이오드로 전류가 새거나(<span class="term">래치업</span>), 아직 전원이 없는 블록으로 신호가 흘러 들어간다. 모든 레일이 목표의 90% 남짓에 이르면 PMIC가 <code>PGOOD</code> 신호를 올리고, 잠시 뒤 SoC의 <code>RESET_N</code>이 풀린다(리셋 회로는 <a href="clock.html">14장</a>). 아래 그림에서 단계를 한 칸씩 넘겨 보자.</p>
+    <figure class="play" id="fig-boot">
+      <div class="play-view"><canvas id="cv-boot"></canvas></div>
+      <div class="play-ctrl"><div class="ctrl-row"><button class="btn sm" id="bt-prev">← 이전</button><span class="sc-steps" id="bt-steps"></span><button class="btn sm primary" id="bt-next">다음 →</button><button class="btn sm" id="bt-play">▶ 자동</button></div></div>
+      <div class="step-desc sc-desc" id="bt-desc"></div>
+      <figcaption><b>그림 16-1.</b> <span class="try">만져 보기</span>전원 인가에서 커널 실행까지의 타임라인. 가로축은 단계마다 같은 폭으로 그렸지만 실제 길이는 몇 ms에서 수백 ms까지 다르다(아래 눈금). 각 단계는 다음 단계가 쓸 자원(전압 → 리셋 → 클럭 → 저장장치 → DRAM)을 하나씩 준비해 준다. 시간은 스마트폰 SoC의 대략값이다.</figcaption>
+    </figure>
+    <p>단계마다 쓸 수 있는 자원이 계단처럼 늘어난다. 부트 ROM은 외부 수정 발진기<span class="en">(XO, 보통 19.2~38.4 MHz)</span>의 느린 클럭으로, 칩 안 SRAM 수백 KB만 가지고 일한다. 그 좁은 공간에 들어갈 만큼 작은 <span class="term">1단계 부트로더</span><span class="en">(BL1, First-stage bootloader)</span>를 저장장치에서 읽어 SRAM에 올린다. BL1은 PLL을 잠가 클럭을 GHz로 올리고(<a href="clock.html">14장</a>), 가장 까다로운 일인 <span class="term">DRAM 트레이닝</span>을 한다. LPDDR의 핀마다 신호가 도착하는 시점과 전압 기준이 다르므로, 시험 패턴을 써 보고 읽어 보며 지연과 기준 전압을 핀별로 맞춘다(<a href="dram.html">7장</a>). 이것이 끝나야 비로소 GB 단위 메모리가 생기고, 그 위에 2단계 부트로더(BL2)와 보안 OS, 운영체제 커널이 올라간다.</p>
+    <div class="callout deep"><strong>이름은 회사마다 다르다</strong><p>Arm의 공개 참조 구현인 Trusted Firmware-A는 단계를 BL1(ROM), BL2(신뢰 부트 펌웨어), BL31(EL3 런타임 모니터), BL32(보안 OS), BL33(U-Boot·UEFI 같은 일반 부트로더)로 나눈다. 휴대폰 제조사들은 PBL·SBL·XBL·iBoot 등 저마다 이름을 쓰지만 구조는 같다. 이 장은 단순화해서 <b>부트 ROM → BL1 → BL2 → 커널</b> 네 주자로 부른다.</p></div>
+  </section>
+
+  <!-- ============================================================ 2 -->
+  <section id="hash">
+    <h2>해시: 펌웨어의 지문</h2>
+    <p>부트 ROM이 BL1을 불러왔다고 하자. 이 코드가 공장에서 나간 그대로인지 어떻게 알까? 수 MB짜리 이미지를 통째로 어딘가에 보관해 두고 비교할 수는 없다. 대신 이미지에서 짧은 <strong>지문</strong>을 뽑는다. 이것이 <span class="term">암호학적 해시 함수</span><span class="en">(Cryptographic hash function)</span>다. SHA-256은 임의 길이의 입력을 512비트 블록으로 잘라 64라운드씩 섞어 256비트(32바이트) 출력을 만든다.</p>
+    <p>좋은 해시는 세 가지 성질을 가진다. 출력에서 입력을 찾을 수 없고<span class="en">(역상 저항성)</span>, 주어진 입력과 같은 출력을 내는 다른 입력을 찾을 수 없으며<span class="en">(제2 역상 저항성)</span>, 같은 출력을 내는 아무 입력 쌍도 찾기 어렵다<span class="en">(충돌 저항성)</span>. 이 성질들을 눈으로 확인하는 가장 쉬운 방법이 <span class="term">눈사태 효과</span><span class="en">(Avalanche effect)</span>다. 입력 1비트만 바꿔도 출력 비트의 약 절반이 뒤집힌다. 아래 64바이트짜리 "펌웨어"는 이 페이지가 직접 SHA-256을 계산한다. 바이트를 눌러 비트를 뒤집어 보자.</p>
+    <figure class="play" id="fig-hash">
+      <div class="play-view"><canvas id="cv-hash"></canvas></div>
+      <div class="play-ctrl">
+        <div><span class="sc-sub">누르면 뒤집힐 비트</span><div class="seg" id="hs-bit"><button data-value="7">b7</button><button data-value="6">b6</button><button data-value="5">b5</button><button data-value="4">b4</button><button data-value="3">b3</button><button data-value="2">b2</button><button data-value="1">b1</button><button data-value="0" class="on">b0</button></div></div>
+        <div class="btn-row"><button class="btn sm" id="hs-rand">무작위 1비트 뒤집기</button><button class="btn sm" id="hs-reset">원본으로</button></div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">입력에서 바뀐 비트</span><span class="v" id="hs-in">0</span></div>
+        <div class="stat"><span class="k">해시에서 바뀐 비트</span><span class="v" id="hs-out">0</span></div>
+        <div class="stat"><span class="k">해시 비트 변화율</span><span class="v" id="hs-pct">0%</span></div>
+      </div>
+      <figcaption><b>그림 16-2.</b> <span class="try">만져 보기</span>왼쪽(좁은 화면에서는 위쪽) 격자는 펌웨어 이미지 64바이트, 바뀐 바이트는 테두리로 표시된다. 오른쪽 16×16 격자는 SHA-256 출력 256비트로, 원본 해시와 다른 비트가 진하게 칠해진다. 아무 비트나 하나 뒤집으면 대략 120~136비트가 바뀐다. 한 번 더 같은 비트를 뒤집으면 원래 해시로 정확히 돌아온다. 해시는 무작위처럼 보이지만 결정적인 함수다.</figcaption>
+    </figure>
+    <p>한 번 뒤집어서 128비트가 바뀐 것은 우연일 수도 있다. 수백 번 반복해 분포를 보자. 각 출력 비트가 독립적으로 반반의 확률로 뒤집힌다면 바뀐 비트 수는 이항 분포를 따른다.</p>
+    <div class="formula">$$E[\Delta] = 256 \times \tfrac12 = 128, \qquad \sigma_\Delta = \sqrt{256 \cdot \tfrac12 \cdot \tfrac12} = 8$$
+      <div class="where">\(\Delta\): 입력 1비트를 뒤집었을 때 바뀐 출력 비트 수. 실제 SHA-256의 분포가 이 이항 분포와 구별되지 않는다는 것이 "출력이 입력에 대해 아무것도 알려 주지 않는다"는 증거 중 하나다.</div></div>
+    <figure class="play" id="fig-aval">
+      <div class="play-view"><canvas id="cv-aval"></canvas></div>
+      <div class="play-ctrl"><div class="btn-row"><button class="btn sm primary" id="av-run">무작위 1비트 변경 × 500</button><button class="btn sm" id="av-clear">지우기</button></div></div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">시행 횟수</span><span class="v" id="av-n">0</span></div>
+        <div class="stat"><span class="k">평균 바뀐 비트</span><span class="v" id="av-m">—</span></div>
+        <div class="stat"><span class="k">표준편차</span><span class="v" id="av-s">—</span></div>
+      </div>
+      <figcaption><b>그림 16-3.</b> <span class="try">만져 보기</span>그림 16-2의 이미지에서 무작위 비트 하나를 뒤집고 SHA-256을 다시 계산하는 일을 반복한다. 막대는 실제로 잰 분포, 곡선은 이항 분포 B(256, ½)의 기댓값이다. 시행을 늘릴수록 둘이 겹친다.</figcaption>
+    </figure>
+    <p>충돌을 무작정 찾으려면 얼마나 해야 할까? \(n\)개의 서로 다른 입력을 해시했을 때 그중 두 개가 같은 출력을 낼 확률은 생일 문제와 같다.</p>
+    <div class="formula">$$P_{\text{충돌}} \approx 1 - e^{-n^2 / 2^{b+1}}, \qquad P = \tfrac12 \;\Rightarrow\; n \approx 1.18 \times 2^{b/2}$$
+      <div class="where">\(b\): 출력 비트 수. SHA-256(\(b=256\))이면 약 \(2^{128}\)번. 초당 \(10^{18}\)번 해시하는 기계로도 우주 나이의 수백억 배가 걸린다. 반면 출력이 64비트뿐이면 \(2^{32}\) ≈ 43억 번, 노트북으로 몇 분이면 된다. 해시 길이가 넉넉해야 하는 이유다.</div></div>
+    <div class="callout warn"><strong>CRC는 해시가 아니다</strong><p><a href="io.html">15장</a>의 CRC도 데이터에서 짧은 값을 뽑지만, 우연한 전송 오류를 잡도록 설계된 선형 함수다. 선형이라 원하는 CRC가 나오도록 데이터를 고치는 일이 간단한 연립방정식으로 풀린다. 고의적인 변조를 막는 데는 SHA-2·SHA-3 같은 암호학적 해시가 필요하다. 반대로 MD5와 SHA-1은 실제 충돌이 공개되어(각각 2004년, 2017년) 새 설계에 쓰지 않는다.</p></div>
+  </section>
+
+  <!-- ============================================================ 3 -->
+  <section id="sign">
+    <h2>디지털 서명과 신뢰의 뿌리</h2>
+    <p>해시만으로는 부족하다. 공격자가 이미지를 바꾸고 해시도 새로 계산해 함께 바꿔 놓으면 그만이기 때문이다. 필요한 것은 "이 해시값을 <strong>제조사가</strong> 승인했다"는 증명이다. 이것이 <span class="term">디지털 서명</span><span class="en">(Digital signature)</span>이다. 제조사는 공장의 하드웨어 보안 모듈(HSM) 안에만 있는 <strong>개인키</strong>로 이미지 해시에 서명하고, 칩은 누구나 알아도 되는 <strong>공개키</strong>로 그 서명을 검증한다. 개인키 없이는 올바른 서명을 만들 수 없다는 것이 RSA·ECDSA 같은 알고리즘의 수학적 보장이다. 이 장에서는 수학은 접어 두고, 서명을 "<em>키 K의 주인이 다이제스트 d를 승인했다</em>"는 위조 불가능한 꼬리표로 다룬다.</p>
+    <p>그럼 칩은 어떤 공개키를 믿어야 할까? 이미지에 공개키를 붙여 보내면, 공격자는 자기 키로 서명하고 자기 공개키를 붙일 것이다. 그래서 믿을 공개키는 칩 안에 바꿀 수 없게 박아 두어야 한다. 대부분의 SoC는 제조 공정 끝에 <span class="term">eFuse</span><span class="en">(OTP, One-time programmable)</span>를 끊어 공개키의 <strong>해시</strong>(ROTPK 해시, 32바이트)를 새긴다. 공개키 자체(RSA-3072이면 384바이트)를 새기는 것보다 퓨즈가 훨씬 적게 들고, 이미지에 붙은 공개키를 해시해 퓨즈 값과 비교하면 그 키가 진짜인지 알 수 있다. 부트 ROM의 코드와 이 퓨즈 값이 칩의 <span class="term">신뢰의 뿌리</span><span class="en">(Root of trust)</span>다. 아래에서 세 가지 검사가 각각 어떤 위조를 잡는지 확인해 보자.</p>
+    <figure class="play" id="fig-sign">
+      <div class="play-view"><canvas id="cv-sign"></canvas></div>
+      <div class="play-ctrl">
+        <div><span class="sc-sub">이미지에 서명한 개인키</span><div class="seg" id="sg-signer"><button data-value="K" class="on">제조사 K</button><button data-value="A">공격자 A</button></div></div>
+        <div><span class="sc-sub">이미지에 붙인 공개키</span><div class="seg" id="sg-attach"><button data-value="K" class="on">K의 공개키</button><button data-value="A">A의 공개키</button></div></div>
+        <label class="check"><input type="checkbox" id="sg-tamper"> 서명 뒤 이미지 1바이트 변경</label>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">판정</span><span class="v" id="sg-res">—</span></div>
+        <div class="stat"><span class="k">처음 실패한 검사</span><span class="v" id="sg-fail" style="font-size:15px">—</span></div>
+      </div>
+      <figcaption><b>그림 16-4.</b> <span class="try">만져 보기</span>검증하는 쪽(부트 ROM)이 하는 세 가지 검사. ① 붙어 온 공개키의 해시가 퓨즈의 ROTPK 해시와 같은가(키의 출처) ② 서명이 그 공개키로 검증되는가(서명의 주인) ③ 서명 안의 다이제스트가 지금 이미지의 SHA-256과 같은가(무결성). 해시값은 실제로 계산한 값의 앞부분이다. 서명 연산 자체는 추상화했다.</figcaption>
+    </figure>
+    <p>세 검사는 서로 다른 구멍을 막는다. 공격자가 자기 키로 서명하고 자기 공개키를 붙이면 ①에서, 제조사 공개키를 붙이고 자기 키로 서명하면 ②에서, 정상 서명을 그대로 두고 이미지만 바꾸면 ③에서 걸린다. 셋 중 하나라도 빠지면 사슬이 끊어진다. 실제로 과거의 여러 부트로더 취약점은 수학이 아니라 이런 검사의 <strong>구현 실수</strong>(길이 검사 누락, 검증 결과를 무시하는 오류 처리 경로 등)에서 나왔다.</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>서명 방식</th><th class="num">공개키</th><th class="num">서명</th><th>특징</th></tr></thead>
+        <tbody>
+          <tr><td>RSA-3072</td><td class="num">384 B</td><td class="num">384 B</td><td>검증이 빠르다(공개 지수 65537). 오래 쓰인 표준</td></tr>
+          <tr><td>ECDSA P-256</td><td class="num">64 B</td><td class="num">64 B</td><td>키·서명이 작다. 검증은 RSA보다 다소 느림</td></tr>
+          <tr><td>ECDSA P-384</td><td class="num">96 B</td><td class="num">96 B</td><td>더 높은 보안 수준(약 192비트)</td></tr>
+          <tr><td>ML-DSA-65 (FIPS 204, 2024)</td><td class="num">1,952 B</td><td class="num">3,309 B</td><td>양자 내성 격자 기반 서명. 크기가 크다</td></tr>
+          <tr><td>LMS (SP 800-208, 2020)</td><td class="num">56 B</td><td class="num">약 1~2 KB</td><td>해시만으로 만든 양자 내성 서명. 서명 횟수 상태 관리가 필요해 펌웨어 서명에 적합</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>양자 컴퓨터가 충분히 커지면 RSA와 ECDSA는 깨진다. 칩은 10년 넘게 쓰이고 부트 ROM은 고칠 수 없으므로, 2024년 이후 설계되는 SoC는 부트 ROM에 양자 내성 서명(ML-DSA나 LMS)을 함께 넣기 시작했다. 서명이 수 KB로 커지면 ROM이 쓸 SRAM과 검증 시간도 다시 계산해야 한다. 보안 결정이 곧 하드웨어 자원 결정이라는 좋은 예다.</p>
+  </section>
+
+  <!-- ============================================================ 4 -->
+  <section id="chain">
+    <h2>신뢰 사슬과 보안 부팅</h2>
+    <p>부트 ROM은 BL1만 검증한다. BL1은 검증이 끝난 코드이므로 이제 믿을 수 있고, BL1이 BL2를, BL2가 커널을 검증한다. 이렇게 앞 단계가 다음 단계를 검증하며 이어지는 것이 <span class="term">신뢰 사슬</span><span class="en">(Chain of trust)</span>이고, 사슬이 끊기면 부팅을 멈추는 것이 <span class="term">보안 부팅</span><span class="en">(Secure boot)</span>이다. 사슬의 강도는 가장 약한 고리가 정한다. 첫 고리인 부트 ROM과 퓨즈는 바꿀 수 없으므로, 공격자가 노릴 곳은 그 뒤의 검증 코드와 설정이다.</p>
+    <p>서명만으로 막지 못하는 공격이 하나 있다. 예전에 제조사가 정상적으로 서명했지만 나중에 취약점이 발견된 <strong>옛 버전</strong>을 다시 설치하는 것이다. 서명은 여전히 유효하다! 이를 막는 장치가 <span class="term">롤백 방지 카운터</span><span class="en">(Anti-rollback counter)</span>다. 퓨즈 몇 개를 온도계처럼 하나씩 끊어 "허용하는 최소 버전"을 기록하고, 이미지의 버전이 그보다 작으면 거부한다. 퓨즈는 끊을 수만 있고 이을 수는 없으므로 카운터는 올라가기만 한다.</p>
+    <div class="sim" id="sim-chain">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>보안 부팅 신뢰 사슬</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="cv-chain"></canvas></div>
+        <div class="sim-controls">
+          <div class="ctrl"><span>보안 부팅 퓨즈 (SECURE_BOOT)</span><div class="seg" id="ch-sb"><button data-value="0">미소자 · 개발용</button><button data-value="1" class="on">소자 · 양산</button></div></div>
+          <div class="ctrl"><span>고칠 이미지 (그림의 상자를 눌러도 된다)</span><div class="seg" id="ch-stage"><button data-value="0" class="on">BL1</button><button data-value="1">BL2</button><button data-value="2">커널</button></div></div>
+          <label class="check"><input type="checkbox" id="ch-tamper"> 이미지 변조 (서명 뒤 1바이트)</label>
+          <div class="ctrl"><span>서명한 키</span><div class="seg" id="ch-key"><button data-value="K" class="on">제조사 K</button><button data-value="A">다른 키 A</button><button data-value="none">서명 없음</button></div></div>
+          <label class="ctrl"><span>이미지 버전 <output id="ch-ver-out"></output></span><input type="range" id="ch-ver" min="0" max="8" step="1" value="3"></label>
+          <label class="check"><input type="checkbox" id="ch-backup" checked> 백업 슬롯 B 사용 (정상 서명, 버전 2)</label>
+          <div><span class="sc-sub">롤백 카운터 퓨즈 (되돌릴 수 없음)</span><div class="btn-row"><button class="btn sm" id="ch-burn">퓨즈 1개 끊기</button><button class="btn sm" id="ch-commit">부팅한 버전으로 올리기</button><button class="btn sm" id="ch-new">새 칩으로</button></div></div>
+        </div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">결과</span><span class="v" id="ch-res" style="font-size:15px">—</span></div>
+        <div class="stat"><span class="k">롤백 카운터</span><span class="v" id="ch-arb">—</span></div>
+        <div class="stat"><span class="k">실행된 이미지</span><span class="v" id="ch-ran" style="font-size:15px">—</span></div>
+      </div>
+      <div class="sc-log" id="ch-log" aria-live="polite"></div>
+      <div class="sim-note">교육용 모델. 서명 검증은 그림 16-4의 세 검사(키 해시·서명 주인·다이제스트)로 추상화했고, 롤백 카운터는 세 이미지가 하나를 함께 쓴다(실제 칩은 부트로더용·OS용 등 여러 개를 둔다). 실패하면 같은 단계의 백업 슬롯 B를 시도하고, 그것도 실패하면 부트 ROM 단계에서는 USB 복구 모드로, 그 뒤 단계에서는 복구 화면으로 멈춘다. 현실의 퓨즈는 한 번 끊으면 되돌릴 수 없다. "새 칩으로"는 실험을 위해 칩을 갈아 끼우는 버튼이다.</div>
+    </div>
+    <p>시뮬레이터에서 몇 가지를 꼭 해 보자. <b>(1)</b> BL2를 변조하면 BL1이 거부하고 백업 슬롯 B로 넘어간다. 백업을 끄면 부팅이 멈춘다. <b>(2)</b> 보안 부팅 퓨즈를 끊지 않은 개발용 칩에서는 같은 변조 이미지가 경고만 남기고 실행된다. 개발용 칩이 시장에 나가면 안 되는 이유다. 반대로 한 번 소자한 퓨즈는 다시 "개발용"으로 돌아갈 수 없다. <b>(3)</b> 커널 버전을 4로 올리고 "부팅한 버전으로 올리기"를 누른 뒤 다시 버전 3으로 내려 보자. 제조사 키로 정상 서명된 이미지인데도 거부된다. 이때 백업 슬롯 B(버전 2)도 함께 쓸 수 없게 된다는 점에 주목하자.</p>
+    <div class="predict"><strong>롤백 카운터 퓨즈가 8개뿐이라면 무슨 문제가 생길까?</strong>
+      <p>보안 업데이트를 낼 때마다 카운터를 올린다면?</p>
+      <details><summary>답 보기</summary><p>온도계 방식이므로 8번 올리면 끝이다. 그 뒤로는 롤백을 막을 수 없다. 그래서 제조사는 모든 업데이트마다가 아니라 <b>심각한 취약점을 고친 업데이트에서만</b> 보안 버전을 올린다. 퓨즈는 칩마다 수천 비트 정도로 귀하고, 이미 끊은 퓨즈는 되살릴 수 없다. 일부 설계는 보안 프로세서 안의 재기록 가능한 보호 저장소(RPMB 같은 인증된 저장 영역)에 카운터를 두어 이 한계를 넘는다.</p></details>
+    </div>
+    <p>보안 부팅은 "실행 전에 검사"만 보장한다. 커널이 뜬 뒤 디스크의 시스템 파티션이 바뀌는 것은 <span class="term">dm-verity</span> 같은 블록 단위 해시 트리가 읽을 때마다 검사한다. 또한 각 단계가 자기가 무엇을 실행했는지 해시를 누적 기록해 두면(<span class="term">측정 부팅</span><span class="en">(Measured boot)</span>), 원격 서버가 그 기록에 대한 서명된 보고(<span class="term">원격 증명</span><span class="en">(Remote attestation)</span>)를 받아 기기가 정상 상태인지 판단할 수 있다. 결제 앱이 "변조된 기기"를 알아보는 방식이다.</p>
+  </section>
+
+  <!-- ============================================================ 5 -->
+  <section id="tz">
+    <h2>TrustZone: 한 칩 안의 두 세계</h2>
+    <p>부팅이 끝나면 칩 위에서는 수백만 줄짜리 운영체제와 수많은 앱이 돈다. 이 중 어딘가에는 반드시 버그가 있다. 지문 템플릿과 결제 키를 운영체제와 같은 메모리에 두면, 커널 취약점 하나로 모두 새어 나간다. 해법은 칩을 두 개의 <span class="term">세계</span><span class="en">(World)</span>로 나누는 것이다. Arm의 <span class="term">TrustZone</span>에서 CPU는 매 순간 일반 세계<span class="en">(Normal world)</span>나 보안 세계<span class="en">(Secure world)</span> 중 하나에서 실행되고, 버스로 나가는 모든 요청에 그 세계를 나타내는 <strong>NS 비트</strong>(AXI의 <code>AxPROT[1]</code>, <a href="noc.html">8장</a>)를 붙인다.</p>
+    <p>CPU만 나누어서는 소용없다. GPU나 DMA 엔진도 메모리를 직접 읽을 수 있기 때문이다. 그래서 메모리 컨트롤러 앞에는 <span class="term">TZASC</span><span class="en">(TrustZone Address Space Controller)</span>, 주변장치 앞에는 <span class="term">TZPC</span>류의 <strong>버스 방화벽</strong>이 서서, 주소 구역마다 "보안 요청만 허용", "모두 허용", "이 마스터의 읽기만 허용" 같은 규칙으로 요청을 검사한다. 규칙에 어긋나는 요청은 버스 오류로 돌려보내거나 0을 읽게 한다. 아래 표의 칸을 눌러 각 마스터가 각 구역에 접근할 때 방화벽이 어떻게 판정하는지 확인하자.</p>
+    <div class="sim" id="sim-tz">
+      <div class="sim-head"><span class="sim-tag">SIMULATOR</span><h3>버스 방화벽: 누가 어디를 읽고 쓰나</h3></div>
+      <div class="sim-body side">
+        <div class="sim-view"><canvas id="cv-tz"></canvas></div>
+        <div class="sim-controls">
+          <label class="check"><input type="checkbox" id="tz-drm" checked> DRM 영상 재생 중 (보호 화면 버퍼)</label>
+          <label class="check"><input type="checkbox" id="tz-face"> 얼굴 인증 중 (보안 카메라 경로)</label>
+          <label class="check"><input type="checkbox" id="tz-off"> 방화벽 설정 누락 (실수 재현)</label>
+          <div class="legend" style="padding:0"><span><i style="background:var(--accent-2)"></i>일반 세계 (NS=1)</span><span><i style="background:var(--accent)"></i>보안 세계 (NS=0)</span></div>
+        </div>
+      </div>
+      <div class="info-panel" id="tz-info"><b>칸을 눌러 보세요.</b> 버스 마스터(행)가 메모리 구역(열)에 접근할 때 방화벽이 어떤 규칙으로 허용·거부하는지 설명한다.</div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">선택한 접근</span><span class="v" id="tz-sel" style="font-size:15px">—</span></div>
+        <div class="stat"><span class="k">판정</span><span class="v" id="tz-ver">—</span></div>
+        <div class="stat"><span class="k">위험하게 열린 칸</span><span class="v" id="tz-risk">0</span></div>
+      </div>
+      <div class="sim-note">RW=읽기·쓰기 허용, R=읽기만, W=쓰기만, ✕=거부. 판정 규칙은 TZASC·TZPC 같은 방화벽에 부팅 중 보안 세계가 써 넣는 설정을 단순화한 것이다. 실제 SoC는 마스터마다 스트림 ID를 붙이고 SMMU(IOMMU)와 함께 더 잘게 나눈다.</div>
+    </div>
+    <p>두 가지를 눈여겨보자. 첫째, <strong>보안 세계는 일반 메모리에 접근할 수 있지만 반대는 안 된다.</strong> 보안 OS가 일반 세계와 데이터를 주고받는 공유 버퍼는 일반 메모리에 둔다. 둘째, <strong>DRM 영상</strong>처럼 CPU의 어떤 세계도 볼 필요가 없는 데이터가 있다. 복호된 영상 프레임은 비디오 디코더가 쓰고 디스플레이 엔진만 읽으면 되므로(<a href="media.html">11장</a>), 그 버퍼는 일반 세계 CPU와 GPU에서 막는다. 화면 캡처 앱이 넷플릭스 화면을 검게 찍는 이유다. 방화벽 설정을 누락하면 이 칸들이 모두 열린다. 하드웨어가 있어도 <strong>부팅 중에 설정해야</strong> 의미가 있고, 그 설정을 하는 코드도 신뢰 사슬 안에 있어야 한다.</p>
+    <p>두 세계 사이를 오가려면 일반 세계 커널이 <code>SMC</code><span class="en">(Secure Monitor Call)</span> 명령을 실행한다. CPU는 가장 높은 권한(EL3)의 <span class="term">보안 모니터</span>로 들어가 레지스터를 저장하고 세계를 바꾼 뒤 보안 OS로 넘어간다. 돌아올 때도 같은 길을 거꾸로 밟는다. 이 왕복에는 레지스터 저장·복원, 파이프라인 비우기, 캐시와 TLB의 간섭이 따라 수 µs가 걸리기도 한다. 그래서 보안 세계에 맡기는 일은 잘게 쪼개지 말고 묶어서 보내야 한다.</p>
+    <figure class="play" id="fig-smc">
+      <div class="play-view"><canvas id="cv-smc"></canvas></div>
+      <div class="play-ctrl">
+        <label class="ctrl"><span>보안 세계 작업 한 번의 길이 W <output id="sm-w-out"></output></span><input type="range" id="sm-w" min="0" max="100" step="1" value="40"></label>
+        <label class="ctrl"><span>세계 전환 한 번의 비용 c <output id="sm-c-out"></output></span><input type="range" id="sm-c" min="0.5" max="20" step="0.5" value="3"></label>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">유효 시간 비율 η</span><span class="v" id="sm-eta">—</span></div>
+        <div class="stat"><span class="k">초당 최대 호출</span><span class="v" id="sm-rate">—</span></div>
+      </div>
+      <figcaption><b>그림 16-5.</b> <span class="try">만져 보기</span>위: SMC 한 번의 왕복. 일반 세계 → 모니터(EL3) 진입 → 보안 OS에서 작업 W → 모니터를 거쳐 복귀. 아래: 작업 길이에 따른 효율 곡선. 전환 비용은 설계와 캐시 상태에 따라 1 µs 미만에서 수십 µs까지 다르다(교육용 범위).</figcaption>
+    </figure>
+    <div class="formula">$$\eta = \frac{W}{W + 2c}$$
+      <div class="where">\(W\): 보안 세계에서 하는 실제 일, \(c\): 진입 또는 복귀 한 번의 비용. 3 µs 전환에 1 µs짜리 일을 시키면 η ≈ 14%로, 시간 대부분을 문을 여닫는 데 쓴다.</div></div>
+    <div class="callout deep"><strong>두 세계로는 부족할 때</strong><p>TrustZone의 보안 세계는 하나뿐이라, 그 안의 신뢰 앱들은 서로를 완전히 믿어야 한다. 그래서 고급 SoC는 아예 별도의 <b>보안 프로세서</b>(보안 엔클레이브)를 둔다. 자기만의 작은 CPU·ROM·SRAM·암호 엔진을 갖고, 메인 CPU와는 메일박스로만 대화한다. Armv9의 CCA(Confidential Compute Architecture)는 "Realm"이라는 세 번째 세계를 더해, 운영체제도 하이퍼바이저도 들여다볼 수 없는 가상 머신을 만든다. 방향은 같다. <b>믿어야 하는 코드(TCB, Trusted Computing Base)를 최대한 작게.</b></p></div>
+  </section>
+
+  <!-- ============================================================ 6 -->
+  <section id="crypto">
+    <h2>암호 엔진, 난수, 키 사다리</h2>
+    <p>보안 부팅의 SHA-256, 저장장치 암호화의 AES는 모두 CPU로도 계산할 수 있다. 최근 CPU에는 AES 한 라운드나 SHA-256 몇 라운드를 명령어 하나로 하는 <strong>암호 확장 명령어</strong>까지 있다. 그런데도 SoC에 별도의 <span class="term">암호 엔진</span><span class="en">(Crypto engine)</span>을 두는 이유는 세 가지다. 에너지(<a href="media.html">11장</a>의 전용 회로 효율), CPU를 다른 일에 쓸 수 있다는 점, 그리고 가장 중요한 <strong>키를 CPU가 볼 필요가 없다</strong>는 점이다. 아래에서 데이터 크기를 바꿔 보자.</p>
+    <figure class="play" id="fig-engine">
+      <div class="play-view"><canvas id="cv-engine"></canvas></div>
+      <div class="play-ctrl">
+        <div class="seg" id="en-alg"><button data-value="aes" class="on">AES-GCM 암호화</button><button data-value="sha">SHA-256 해시</button></div>
+        <label class="ctrl"><span>데이터 크기 <output id="en-n-out"></output></span><input type="range" id="en-n" min="6" max="30" step="1" value="16"></label>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">CPU 소프트웨어</span><span class="v" id="en-sw">—</span></div>
+        <div class="stat"><span class="k">CPU + 암호 명령어</span><span class="v" id="en-ce">—</span></div>
+        <div class="stat"><span class="k">전용 엔진</span><span class="v" id="en-hw">—</span></div>
+        <div class="stat"><span class="k">엔진 에너지 이득</span><span class="v" id="en-gain">—</span></div>
+      </div>
+      <figcaption><b>그림 16-6.</b> <span class="try">만져 보기</span>세 방식의 처리 시간(로그-로그). 각 칸은 시간과 에너지다. 전용 엔진은 작업을 넘기는 데 고정 비용(설명자 작성·인터럽트, 약 10 µs)이 들어 작은 데이터에서는 오히려 느리지만, 바이트당 에너지가 수십 배 작다. 수치는 큰 코어 2.5 W, 엔진 0.1 W를 가정한 교육용 대략값이다.</figcaption>
+    </figure>
+    <div class="formula">$$t(n) = t_0 + \frac{n}{B}, \qquad E(n) = P_{\text{설정}}\,t_0 + P\,\frac{n}{B}$$
+      <div class="where">\(t_0\): 작업을 넘기는 고정 시간, \(B\): 처리량, \(P\): 동작 전력. 고정 비용이 있는 가속기는 데이터가 일정 크기 이상일 때만 이득이다. <a href="io.html">15장</a>의 DMA와 같은 계산이다.</div></div>
+    <p>암호의 또 다른 재료는 <strong>예측할 수 없는 난수</strong>다. 키를 만들고, 서명마다 새 값을 쓰고, 통신마다 일회용 값을 만든다. 소프트웨어 난수 생성기는 씨앗이 같으면 같은 수열을 내므로, 씨앗만큼은 물리 현상에서 얻어야 한다. 이것이 <span class="term">진성 난수 발생기</span><span class="en">(TRNG, True random number generator)</span>다. 흔한 구조는 <span class="term">링 오실레이터</span>(인버터를 홀수 개 고리로 이은 발진기)를 빠르게 돌리고, 독립된 느린 클럭으로 그 출력을 샘플링하는 것이다. 트랜지스터의 열잡음 때문에 링의 주기는 매번 조금씩 흔들리고(<span class="term">지터</span>), 샘플링 사이에 그 흔들림이 쌓이면 샘플 순간의 위상을 예측할 수 없게 된다.</p>
+    <figure class="play" id="fig-trng">
+      <div class="play-view"><canvas id="cv-trng"></canvas></div>
+      <div class="play-ctrl">
+        <label class="ctrl"><span>샘플 사이 누적 지터 σ <output id="tr-j-out"></output></span><input type="range" id="tr-j" min="0" max="0.5" step="0.005" value="0.02"></label>
+        <label class="ctrl"><span>링 출력의 1 구간 비율 (치우침) <output id="tr-d-out"></output></span><input type="range" id="tr-d" min="0.3" max="0.7" step="0.01" value="0.5"></label>
+        <label class="check"><input type="checkbox" id="tr-vn"> 폰 노이만 보정</label>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">1의 비율</span><span class="v" id="tr-p">—</span></div>
+        <div class="stat"><span class="k">이웃 비트 상관</span><span class="v" id="tr-c">—</span></div>
+        <div class="stat"><span class="k">4비트 블록 엔트로피</span><span class="v" id="tr-h">—</span></div>
+        <div class="stat"><span class="k">출력/원시 비트</span><span class="v" id="tr-r">—</span></div>
+      </div>
+      <figcaption><b>그림 16-7.</b> <span class="try">만져 보기</span>왼쪽(위) 원은 링 오실레이터의 위상이고, 색칠된 호가 출력 1인 구간이다. 점은 최근 샘플이 찍힌 위상이다. 지터가 작으면 샘플 위상이 몇 군데에만 모여 비트열에 규칙이 생긴다(엔트로피 낮음). 지터를 키우면 점이 원 전체로 퍼진다. 1 구간 비율을 바꾸면 1과 0의 비율이 치우치는데, 폰 노이만 보정(01→0, 10→1, 같으면 버림)은 독립인 비트의 치우침을 없애는 대신 비트를 4분의 1 이하로 줄인다.</figcaption>
+    </figure>
+    <p>그림에서 보듯 원시 비트는 그대로 쓰기에 부족하다. 실제 TRNG는 원시 엔트로피원의 상태를 끊임없이 감시하는 <strong>건강 검사</strong>(같은 값이 너무 오래 반복되거나 한 값이 너무 많으면 경보, NIST SP 800-90B)를 두고, 해시나 AES로 원시 비트를 <strong>압축·정제</strong>한 뒤, 그 결과를 씨앗으로 결정적 난수 생성기(DRBG, SP 800-90A)를 돌려 빠르게 난수를 뽑는다. 원시 비트의 엔트로피가 비트당 0.5라면 256비트 씨앗을 위해 적어도 512비트를 모아야 한다.</p>
+    <p>마지막 재료는 <strong>키를 어디에 두는가</strong>다. 칩마다 다른 <span class="term">하드웨어 고유 키</span><span class="en">(HUK, Hardware unique key)</span>를 퓨즈나 PUF(공정 편차로 만든 칩 지문)에 넣어 두고, 그 값은 어떤 소프트웨어도 읽을 수 없게 암호 엔진에만 배선한다. 필요한 키는 HUK에서 용도 라벨을 넣어 <span class="term">키 유도</span><span class="en">(KDF, Key derivation function)</span>로 뽑아 내고, 그 키로 다른 키를 감싼다(<span class="term">키 래핑</span>). 이렇게 키가 계단처럼 이어진 구조를 <span class="term">키 사다리</span><span class="en">(Key ladder)</span>라 한다. CPU는 "슬롯 3의 키로 이 데이터를 암호화해 줘"라고 요청할 뿐, 키 값은 끝까지 보지 못한다.</p>
+    <figure class="play" id="fig-key">
+      <div class="play-view"><canvas id="cv-key"></canvas></div>
+      <div class="play-ctrl">
+        <div><span class="sc-sub">유도할 키의 용도 라벨</span><div class="seg" id="ky-label"><button data-value="storage" class="on">저장소</button><button data-value="drm">DRM</button><button data-value="bio">생체 정보</button></div></div>
+        <div class="btn-row"><button class="btn sm" id="ky-read">CPU: 키 값 읽기</button><button class="btn sm primary" id="ky-enc">CPU: 이 키로 암호화</button><button class="btn sm" id="ky-chip">다른 칩으로 옮기기</button></div>
+      </div>
+      <div class="info-panel" id="ky-info"><b>버튼을 눌러 보세요.</b> CPU가 할 수 있는 요청과 할 수 없는 요청을 비교한다.</div>
+      <figcaption><b>그림 16-8.</b> <span class="try">만져 보기</span>키 사다리. 유도 키는 HMAC-SHA256(HUK, 라벨)로 실제 계산하지만 화면에는 키 값 대신 "키 지문"(키를 다시 해시한 값의 앞 4바이트)만 보인다. 라벨이 다르면 전혀 다른 키가 나오고, 칩이 다르면(HUK가 다르면) 같은 라벨이라도 다른 키가 나온다. 그래서 한 칩에서 암호화한 데이터는 다른 칩에서 풀리지 않는다. 암호화는 SHA-256 카운터 모드로 만든 교육용 스트림 암호다.</figcaption>
+    </figure>
+    <div class="predict"><strong>휴대폰 메인보드를 통째로 바꿔도 저장장치의 사진을 읽을 수 있을까?</strong>
+      <p>저장장치(UFS) 칩만 떼어 새 보드에 붙인다면?</p>
+      <details><summary>답 보기</summary><p>읽을 수 없다. 파일 암호화 키는 원래 SoC의 HUK에서 유도된 키로 감싸져 저장장치에 들어 있다. 새 SoC는 HUK가 달라서 같은 라벨로 유도해도 다른 키가 나오고, 감싼 키를 풀지 못한다. 사용자의 잠금 화면 비밀번호도 유도 과정에 섞이므로, 원래 칩이 있더라도 비밀번호 없이는 풀 수 없다. 그림 16-8의 "다른 칩으로 옮기기"가 바로 이 상황이다.</p></details>
+    </div>
+  </section>
+
+  <!-- ============================================================ 7 -->
+  <section id="side">
+    <h2>부채널과 물리 공격</h2>
+    <p>암호 알고리즘이 수학적으로 완벽해도, 그것을 계산하는 <strong>회로</strong>는 물리 세계에 흔적을 남긴다. 걸린 시간, 소모한 전력, 내뿜은 전자기파. 이런 의도하지 않은 정보 통로를 <span class="term">부채널</span><span class="en">(Side channel)</span>이라 한다. 1996년 Paul Kocher가 실행 시간만으로, 1999년에는 전력 소모만으로 비밀 정보가 새어 나갈 수 있음을 보인 뒤 이 분야는 칩 보안 설계의 기본 항목이 되었다. 여기서는 공격 방법이 아니라 <strong>왜 새는지</strong>와 <strong>어떻게 막는지</strong>에 집중한다.</p>
+    <h3>데이터에 따라 달라지는 시간</h3>
+    <p>비밀번호나 인증 태그를 비교하는 가장 자연스러운 코드는 앞에서부터 한 바이트씩 비교하다가 다르면 바로 돌아오는 것이다. 이 코드의 실행 시간은 <strong>앞에서 몇 바이트가 맞았는지</strong>에 비례한다. 그 차이가 수 나노초라도 측정을 여러 번 하면 잡음 속에서 드러난다. 대책은 입력과 무관하게 언제나 모든 바이트를 비교하고 결과를 마지막에 한 번만 판단하는 <span class="term">상수 시간</span><span class="en">(Constant-time)</span> 코드다.</p>
+    <figure class="play" id="fig-timing">
+      <div class="play-view"><canvas id="cv-timing"></canvas></div>
+      <div class="play-ctrl">
+        <div class="seg" id="tm-impl"><button data-value="early" class="on">조기 종료 비교</button><button data-value="const">상수 시간 비교</button><button data-value="both">둘 다</button></div>
+        <label class="ctrl"><span>측정 잡음 σ <output id="tm-n-out"></output></span><input type="range" id="tm-n" min="0" max="40" step="1" value="8"></label>
+        <button class="btn sm" id="tm-again">다시 측정</button>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">조기 종료: 한 바이트당 차이</span><span class="v" id="tm-d1">—</span></div>
+        <div class="stat"><span class="k">상수 시간: 한 바이트당 차이</span><span class="v" id="tm-d2">—</span></div>
+        <div class="stat"><span class="k">차이를 구분할 측정 수(대략)</span><span class="v" id="tm-need">—</span></div>
+      </div>
+      <figcaption><b>그림 16-9.</b> <span class="try">만져 보기</span>16바이트 비교 함수의 실행 시간(사이클)을 입력의 "맞은 앞부분 길이"마다 24번씩 잰 모형. 조기 종료 비교는 맞은 바이트가 늘수록 계단처럼 길어지고, 상수 시간 비교는 평평하다. 잡음을 키워도 평균을 내면 계단이 다시 드러난다. 측정 수는 평균의 표준오차가 한 계단의 1/3이 될 때까지로 어림했다.</figcaption>
+    </figure>
+    <div class="sc-code"><pre>// 조기 종료: 시간이 데이터에 따라 달라진다
+for (i = 0; i &lt; 16; i++)
+  if (a[i] != b[i]) return FAIL;
+return OK;</pre><pre>// 상수 시간: 모든 바이트를 항상 비교한다
+diff = 0;
+for (i = 0; i &lt; 16; i++) diff |= a[i] ^ b[i];
+return diff == 0 ? OK : FAIL;</pre></div>
+    <p>CPU 수준에서도 같은 원리가 적용된다. 비밀 값에 따라 분기하거나, 비밀 값으로 표의 위치를 골라 읽으면 분기 예측기와 캐시(<a href="cache.html">5장</a>)에 흔적이 남는다. 테이블 조회로 구현한 소프트웨어 AES가 캐시 타이밍으로 새는 것이 대표적이다. 암호 확장 명령어와 전용 엔진은 데이터와 무관한 시간으로 동작하도록 설계되어 이 문제를 함께 푼다. 추측 실행이 남기는 흔적을 이용한 Spectre류 문제(<a href="ooo.html">4장</a>)나 DRAM 행을 반복해 두드려 이웃 비트를 뒤집는 Rowhammer(<a href="dram.html">7장</a>)도 같은 계열의 "하드웨어 최적화가 만든 부작용"이다.</p>
+    <h3>전력에 새는 해밍 가중치</h3>
+    <p>CMOS 회로는 비트가 바뀔 때 전력을 쓴다(<a href="power.html">12장</a>의 \(\alpha C V^2 f\)). 레지스터나 버스에 값 \(v\)가 실릴 때 소모 전력은 대략 그 값의 1인 비트 수, 즉 <span class="term">해밍 가중치</span><span class="en">(Hamming weight)</span>에 비례한다. 전력을 잴 수 있으면 그 값에 대한 정보가 조금씩 샌다. 아래에서 버스에 실을 값을 바꾸고, 방어 방식을 골라 보자.</p>
+    <figure class="play" id="fig-power">
+      <div class="play-view"><canvas id="cv-power"></canvas></div>
+      <div class="play-ctrl">
+        <div><span class="sc-sub">버스에 실리는 값 v (비트를 누른다)</span><div class="sc-bits" id="pw-bits"></div></div>
+        <div class="seg" id="pw-def"><button data-value="none" class="on">보호 없음</button><button data-value="noise">잡음 추가</button><button data-value="mask">마스킹</button></div>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">HW(v)</span><span class="v" id="pw-hw">—</span></div>
+        <div class="stat"><span class="k">전력–HW 상관계수 ρ</span><span class="v" id="pw-rho">—</span></div>
+        <div class="stat"><span class="k">상관을 확인할 측정 수(대략)</span><span class="v" id="pw-n">—</span></div>
+      </div>
+      <figcaption><b>그림 16-10.</b> <span class="try">만져 보기</span>위(왼쪽): 10클럭 동안의 전력 파형 모형. 4번째 클럭에 값 v가 버스에 실리며 뾰족한 봉우리가 생긴다. 아래(오른쪽): 무작위 값 400개에 대해 HW(v)와 그 봉우리 높이를 찍은 산점도. 잡음 추가는 상관을 약하게 할 뿐이라 측정을 늘리면 다시 보이지만, 마스킹은 매번 새 난수 m으로 v⊕m을 처리하므로 1차 상관이 사라진다.</figcaption>
+    </figure>
+    <div class="formula">$$\rho = \frac{a\,\sigma_{\mathrm{HW}}}{\sqrt{a^2\sigma_{\mathrm{HW}}^2 + \sigma_n^2}}, \qquad N \approx 3 + 8\left(\frac{z_{1-\alpha}}{\ln\frac{1+\rho}{1-\rho}}\right)^2$$
+      <div class="where">\(a\): 비트 하나당 전력, \(\sigma_{\mathrm{HW}} = \sqrt{2}\)(8비트 무작위 값), \(\sigma_n\): 잡음. \(N\)은 상관을 통계적으로 확인하는 데 필요한 측정 수의 어림식(Mangard 2004, \(z_{1-\alpha}\) ≈ 3.7). 잡음은 \(N\)을 늘릴 뿐 0으로 만들지 못한다.</div></div>
+    <p>방어는 크게 두 갈래다. <strong>숨기기</strong><span class="en">(Hiding)</span>는 잡음을 더하고, 연산 순서를 무작위로 섞고, 0→1과 1→0이 같은 전력을 쓰도록 이중 레일 논리를 쓰는 것이다. <strong>마스킹</strong><span class="en">(Masking)</span>은 비밀 값을 난수와 섞어 여러 조각으로 나누고 각 조각을 따로 계산해, 어느 한 지점의 전력도 비밀 값과 상관이 없게 만든다. 마스킹은 난수(앞 절의 TRNG)와 면적을 많이 쓰지만 효과가 수학적으로 분명하다. 보안 엔클레이브와 결제용 보안 칩은 이런 대책을 하드웨어에 넣고, 국제 인증(CC EAL, FIPS 140-3)으로 시험받는다.</p>
+    <h3>결함 주입</h3>
+    <p>시간과 전력을 엿보는 대신, 일부러 <strong>오동작을 일으키는</strong> 공격도 있다. 전원 전압을 아주 짧게 떨어뜨리거나(전압 글리치), 클럭에 짧은 펄스를 끼우거나, 전자기 펄스나 레이저를 쬐면 플립플롭이 잘못된 값을 잡거나 명령어 하나가 건너뛰어질 수 있다(<a href="logic.html">2장</a>의 setup 위반을 일부러 만드는 셈이다). 서명 검증의 마지막 비교 하나를 건너뛰게 만들면 신뢰 사슬 전체가 무너진다. 그래서 설계자는 <strong>탐지</strong>와 <strong>중복</strong>으로 대응한다.</p>
+    <figure class="play" id="fig-glitch">
+      <div class="play-view"><canvas id="cv-glitch"></canvas></div>
+      <div class="play-ctrl">
+        <label class="ctrl"><span>전압 글리치 깊이 <output id="gl-d-out"></output></span><input type="range" id="gl-d" min="0" max="400" step="5" value="200"></label>
+        <label class="ctrl"><span>글리치 감지기 문턱 <output id="gl-t-out"></output></span><input type="range" id="gl-t" min="50" max="400" step="5" value="300"></label>
+        <label class="check"><input type="checkbox" id="gl-red"> 중복 검사 (두 번 비교 + 불일치 시 리셋)</label>
+      </div>
+      <div class="sim-readout">
+        <div class="stat"><span class="k">검증 우회</span><span class="v" id="gl-byp">—</span></div>
+        <div class="stat"><span class="k">탐지·리셋</span><span class="v" id="gl-det">—</span></div>
+        <div class="stat"><span class="k">정상 동작</span><span class="v" id="gl-ok">—</span></div>
+      </div>
+      <figcaption><b>그림 16-11.</b> <span class="try">만져 보기</span>왼쪽(위): 공급 전압의 순간 강하와 감지기 문턱. 오른쪽(아래): 같은 조건으로 1,000번 시도한 결과의 비율. 강하가 깊을수록 비교 명령이 잘못 실행될 확률이 오르지만, 너무 깊으면 칩이 그냥 멈춘다. 감지기 문턱을 낮추면 글리치를 잡지만 정상적인 전압 출렁임에도 오경보가 난다(<a href="thermal.html">13장</a>의 전압 강하). 결함 확률과 감지 특성은 교육용 모형이다.</figcaption>
+    </figure>
+    <p>중복 검사는 같은 비교를 두 번, 가능하면 서로 다른 방식(예: 결과를 반전해 한 번 더)으로 하고 둘이 다르면 즉시 리셋한다. 공격자가 두 번 모두 정확히 맞혀야 하므로 성공 확률이 대략 제곱으로 준다. 여기에 "성공" 값을 0과 1 대신 해밍 거리가 먼 특별한 상수로 쓰기, 검증 직후 무작위 지연 넣기, 칩 표면을 덮는 능동 차폐 배선, 빛·온도·클럭 주파수 센서가 더해진다. 하나하나는 완벽하지 않지만 겹겹이 쌓아 공격 비용을 높이는 것, 이것이 <span class="term">심층 방어</span><span class="en">(Defense in depth)</span>다.</p>
+    <div class="callout warn"><strong>디버그 포트는 정문이다</strong><p>JTAG 같은 디버그 포트는 개발 중에는 꼭 필요하지만, 열려 있으면 CPU를 멈추고 메모리를 마음대로 읽을 수 있는 정문이 된다. 양산 칩은 퓨즈로 디버그를 잠그거나, 제조사가 서명한 칩별 인증서를 제시해야만 여는 <b>인증된 디버그</b>를 쓴다. 보안 부팅 퓨즈와 함께 디버그 잠금 퓨즈를 끊는 것이 공장 출하의 마지막 단계다.</p></div>
+  </section>
+
+  <!-- ============================================================ 8 -->
+  <section id="blocks">
+    <h2>SoC 보안 블록 한눈에</h2>
+    <p>지금까지 본 장치들을 칩의 블록으로 다시 모아 보자. SB-1의 보안 엔클레이브는 다이 면적의 1~2%에 불과하지만(<a href="overview.html">1장</a>), 그 영향은 부팅·메모리·저장장치·디스플레이·디버그까지 칩 전체에 퍼져 있다. 보안은 한 블록이 아니라 <strong>모든 블록의 설정과 연결</strong>에서 나온다.</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>블록</th><th>하는 일</th><th>막는 위협</th></tr></thead>
+        <tbody>
+          <tr><td><span class="chip"><i style="background:var(--b-sec)"></i>부트 ROM</span></td><td>첫 코드. BL1 서명 검증, 복구 모드</td><td>부팅 코드 바꿔치기 (수정 불가라 버그도 못 고침)</td></tr>
+          <tr><td><span class="chip"><i style="background:var(--b-sec)"></i>eFuse · OTP</span></td><td>ROTPK 해시, 보안 부팅·디버그 잠금, 롤백 카운터, HUK</td><td>신뢰 기준 변경, 옛 버전 재설치</td></tr>
+          <tr><td><span class="chip"><i style="background:var(--b-sec)"></i>보안 프로세서</span></td><td>독립 CPU·SRAM에서 키 관리, 생체 인증, 증명</td><td>메인 OS 침해가 비밀로 번지는 것</td></tr>
+          <tr><td><span class="chip"><i style="background:var(--b-sec)"></i>암호 엔진 · 키 관리자</span></td><td>AES·SHA·공개키 연산, 키 슬롯, 키 사다리</td><td>키 유출, 소프트웨어 타이밍 누출</td></tr>
+          <tr><td><span class="chip"><i style="background:var(--b-sec)"></i>TRNG</span></td><td>물리 잡음 → 건강 검사 → DRBG 씨앗</td><td>예측 가능한 키·일회용 값</td></tr>
+          <tr><td><span class="chip"><i style="background:var(--b-noc)"></i>TZASC · TZPC · SMMU</span></td><td>주소 구역·주변장치·마스터별 접근 검사</td><td>DMA·GPU를 통한 보안 메모리 접근</td></tr>
+          <tr><td><span class="chip"><i style="background:var(--b-io)"></i>인라인 저장소 암호화</span></td><td>UFS 컨트롤러 경로에서 AES-XTS로 실시간 암·복호</td><td>저장 칩을 떼어 읽기</td></tr>
+          <tr><td><span class="chip"><i style="background:var(--b-mem)"></i>메모리 암호화 엔진</span></td><td>DRAM으로 나가는 데이터 암호화(보안 영역 위주)</td><td>메모리 버스 엿보기, 콜드 부트</td></tr>
+          <tr><td><span class="chip"><i style="background:var(--b-pmu)"></i>전압·클럭·온도 센서</span></td><td>글리치·이상 주파수·과열 감지 → 리셋</td><td>결함 주입</td></tr>
+          <tr><td><span class="chip"><i style="background:var(--b-io)"></i>디버그 인증</span></td><td>JTAG 잠금, 서명된 인증서로만 열기</td><td>디버그 포트로 메모리 읽기</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p><strong>저장소 암호화</strong>는 거의 모든 스마트폰이 기본으로 한다. 예전에는 CPU가 블록을 암호화한 뒤 저장장치로 보냈지만, 지금은 UFS 컨트롤러의 DMA 경로 안에 <span class="term">인라인 암호 엔진</span>을 두어 데이터가 지나가는 김에 AES-XTS로 암·복호한다(<a href="io.html">15장</a>). 키는 키 사다리에서 바로 엔진의 키 슬롯으로 들어가므로 CPU 메모리를 거치지 않는다. <strong>DRAM 암호화</strong>는 서버 CPU에서는 흔하지만 스마트폰에서는 대역폭·지연·전력 부담 때문에 보안 프로세서 영역 같은 일부 구역에 주로 쓴다. 메모리 칩과 SoC가 한 패키지 위에 쌓여 있어 버스를 엿보기가 서버보다 어렵다는 점도 이유다. 어떤 대책을 어디까지 넣을지는 결국 <strong>위협 모델</strong>(누가, 무엇을, 얼마의 비용으로 노리는가)과 면적·전력 예산 사이의 설계 결정이다.</p>
+    <div class="callout tip"><strong>보안 설계자의 세 질문</strong><p><b>① 무엇을 믿는가?</b> 믿는 것(TCB)이 작을수록 좋다. <b>② 그 믿음은 어디서 오는가?</b> 바꿀 수 없는 ROM과 퓨즈에서 출발해 한 고리씩 검증되어야 한다. <b>③ 물리적으로 무엇이 새는가?</b> 시간·전력·결함에 대한 대책이 없다면 수학적 안전은 회로에서 끝난다.</p></div>
+  </section>
+
+  <section class="keypoints">
+    <h2>핵심 정리</h2>
+    <ol>
+      <li>부팅은 PMIC 레일 순서 → 리셋 해제 → 부트 ROM(SRAM, 느린 클럭) → BL1(PLL·DRAM 트레이닝) → BL2·보안 OS → 커널로, 단계마다 다음 단계가 쓸 자원을 준비한다.</li>
+      <li>SHA-256 같은 해시는 입력 1비트 변화에도 출력 비트의 약 절반(평균 128, 표준편차 8)이 바뀌며, 충돌을 찾는 데 약 \(2^{128}\)번이 든다.</li>
+      <li>서명 검증은 ① 공개키 해시 = 퓨즈의 ROTPK 해시 ② 서명이 그 키로 검증됨 ③ 다이제스트 = 이미지 해시, 셋이 모두 맞아야 한다. 부트 ROM과 퓨즈가 신뢰의 뿌리다.</li>
+      <li>신뢰 사슬은 각 단계가 다음 단계를 검증하며 이어지고, 한 번만 끊을 수 있는 롤백 카운터 퓨즈가 정상 서명된 옛 버전의 재설치를 막는다.</li>
+      <li>TrustZone은 모든 버스 요청에 NS 비트를 붙이고 TZASC·TZPC 방화벽이 구역별로 검사한다. 보안 세계는 일반 메모리를 볼 수 있지만 반대는 안 되며, 세계 전환에는 µs 단위 비용이 든다.</li>
+      <li>암호 엔진·TRNG·키 사다리는 키가 CPU에 노출되지 않게 하고, 상수 시간 코드·마스킹·글리치 감지·중복 검사가 부채널과 결함 주입을 막는다.</li>
+    </ol>
+  </section>
+
+  <section class="quiz-sec">
+    <h2>확인 퀴즈</h2>
+    <div class="quiz">
+      <div class="quiz-q"><p>Q1. 부팅의 첫 코드를 마스크 ROM에 두는 가장 중요한 이유는?</p>
+        <div class="opts">
+          <button class="opt">ROM이 DRAM보다 빠르기 때문에</button>
+          <button class="opt">ROM은 전력을 쓰지 않기 때문에</button>
+          <button class="opt" data-correct>제조 후 바꿀 수 없어 신뢰 사슬의 출발점이 될 수 있기 때문에</button>
+          <button class="opt">ROM에는 용량 제한이 없기 때문에</button>
+        </div>
+        <div class="quiz-exp">바꿀 수 없다는 것이 곧 믿을 수 있다는 근거다. 그래서 신뢰의 뿌리가 되지만, 같은 이유로 ROM의 버그는 고칠 수 없다. ROM 코드를 작고 단순하게 유지하는 이유다.</div></div>
+      <div class="quiz-q"><p>Q2. eFuse에 공개키 자체 대신 공개키의 해시를 새기는 이유로 가장 알맞은 것은?</p>
+        <div class="opts">
+          <button class="opt" data-correct>퓨즈 비트가 귀한데, 32바이트 해시만으로도 이미지에 붙어 온 공개키가 진짜인지 확인할 수 있어서</button>
+          <button class="opt">해시는 공개키보다 계산이 빨라서 서명 검증이 필요 없어지기 때문에</button>
+          <button class="opt">공개키는 비밀이어서 칩에 넣으면 안 되기 때문에</button>
+          <button class="opt">해시를 넣으면 나중에 키를 바꿀 수 있기 때문에</button>
+        </div>
+        <div class="quiz-exp">RSA-3072 공개키는 384바이트지만 SHA-256 해시는 32바이트다. 이미지에 붙어 온 공개키를 해시해 퓨즈 값과 비교하면 같은 보장을 얻는다. 공개키는 비밀이 아니고, 퓨즈는 한 번 쓰면 바꿀 수 없다.</div></div>
+      <div class="quiz-q"><p>Q3. 롤백 카운터 퓨즈가 6일 때, 제조사 키로 정상 서명된 버전 5 이미지는 어떻게 되는가?</p>
+        <div class="opts">
+          <button class="opt">서명이 유효하므로 실행된다</button>
+          <button class="opt">실행하고 카운터를 5로 낮춘다</button>
+          <button class="opt">경고만 표시하고 실행된다</button>
+          <button class="opt" data-correct>버전이 카운터보다 낮아 거부된다</button>
+        </div>
+        <div class="quiz-exp">롤백 방지는 "취약점이 알려진 옛 버전이지만 서명은 유효한" 이미지를 막기 위한 것이다. 퓨즈는 끊을 수만 있으므로 카운터는 내려가지 않는다.</div></div>
+      <div class="quiz-q"><p>Q4. GPU가 보안 DRAM 구역의 주소를 읽으려 할 때 막는 것은?</p>
+        <div class="opts">
+          <button class="opt">CPU의 페이지 테이블</button>
+          <button class="opt" data-correct>메모리 컨트롤러 앞의 TZASC 방화벽 (요청에 NS=1이 붙어 있으므로)</button>
+          <button class="opt">GPU 드라이버의 권한 검사</button>
+          <button class="opt">DRAM 칩 자체의 잠금 기능</button>
+        </div>
+        <div class="quiz-exp">GPU는 CPU의 페이지 테이블을 거치지 않고 버스로 직접 요청한다. 그래서 검사는 버스 쪽, 즉 메모리 앞의 방화벽이 요청의 보안 속성(NS 비트)과 주소 구역을 보고 해야 한다. 소프트웨어 검사는 드라이버가 침해되면 무력하다.</div></div>
+      <div class="quiz-q"><p>Q5. 인증 태그를 상수 시간 코드로 비교하는 목적은?</p>
+        <div class="opts">
+          <button class="opt">비교를 더 빠르게 하려고</button>
+          <button class="opt">캐시 적중률을 높이려고</button>
+          <button class="opt" data-correct>실행 시간이 "앞에서 몇 바이트가 맞았는지"를 드러내지 않게 하려고</button>
+          <button class="opt">컴파일러 최적화를 막으려고</button>
+        </div>
+        <div class="quiz-exp">조기 종료 비교는 맞은 바이트 수에 비례해 오래 걸린다. 반복 측정하면 잡음 속에서도 그 차이가 드러난다. 상수 시간 비교는 언제나 모든 바이트를 처리해 시간이 입력과 무관하다.</div></div>
+      <div class="quiz-q"><p>Q6. 전력 부채널 대책으로서 마스킹이 잡음 추가보다 근본적인 이유는?</p>
+        <div class="opts">
+          <button class="opt" data-correct>매번 새 난수와 섞어 계산하므로 한 지점의 전력이 비밀 값과 1차 상관을 갖지 않는다</button>
+          <button class="opt">전력 소모를 0으로 만든다</button>
+          <button class="opt">난수가 필요 없다</button>
+          <button class="opt">회로 면적이 줄어든다</button>
+        </div>
+        <div class="quiz-exp">잡음은 상관계수를 낮출 뿐이라 측정 수를 늘리면 극복된다. 마스킹은 처리되는 값 자체가 비밀과 독립이 되게 한다. 대가로 TRNG의 난수와 추가 면적·전력이 든다.</div></div>
+    </div>
+  </section>
+</main>
+
+<!--SCRIPT-->
+</body>
+</html>
