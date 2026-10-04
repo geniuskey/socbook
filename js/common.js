@@ -535,6 +535,10 @@
     foot.innerHTML = `SoCBook — 공학도를 위한 인터랙티브 시스템 온 칩 교과서 · 수치는 교육용 근사 모델입니다.<br>
       시리즈: <a href="https://processbook.euiyun.com/">ProcessBook</a> · <a href="https://designbook.euiyun.com/">DesignBook</a> · <a href="https://memorybook.euiyun.com/">MemoryBook</a> · <a href="https://computerbook.euiyun.com/">ComputerBook</a> · <a href="https://books.euiyun.com/">전체 책장</a><br>
       © 2026 geniuskey 및 SoCBook 기여자 · 콘텐츠 <a rel="license" href="https://creativecommons.org/licenses/by/4.0/">CC BY 4.0</a> · 코드 <a href="${root}LICENSE-MIT">MIT</a> · <a href="${root}LICENSE.md">라이선스 안내</a>`;
+    const feedbackLink = document.createElement("a");
+    feedbackLink.href = "https://books.euiyun.com/feedback.html?book=socbook&page=" + encodeURIComponent(location.href);
+    feedbackLink.textContent = "오류·질문·제안";
+    foot.append(" · ", feedbackLink);
     body.appendChild(foot);
 
     // quiz
