@@ -147,12 +147,12 @@
       </div>
       <div class="sim-note">WS: PE(k, n)에 가중치 \(W_{kn}\)이 미리 실려 있다. \(A\)의 행 \(m\)의 원소 \(A_{mk}\)는 왼쪽에서 \(k\) 사이클 늦게 들어와 오른쪽으로 흐르고, 부분합은 위에서 아래로 흘러 맨 아래에서 \(C_{mn}\)이 나온다(오른쪽 결과판). OS: PE(i, j)가 \(C_{ij}\)를 붙잡고 누적한다. \(A\)는 왼쪽에서, \(B\)는 위에서 엇갈려 들어온다. 초록 테두리 = 이번 사이클에 MAC을 한 PE. 결과는 실제로 계산해 정답과 비교한다.</div>
     </div>
-    <p>배열이 다 차고 다 비는 데 걸리는 시간이 보이는가? 첫 결과가 나오기까지 \(2S-1\) 사이클 남짓이 걸리고, 마지막 데이터가 빠져나가는 데도 그만큼 걸린다. 전체 사이클은 약 \(L + 2S - 1\)이므로</p>
-    <div class="formula">$$\text{사용률} \approx \frac{L}{L + 2S - 1}$$</div>
+    <p>배열이 다 차고 다 비는 데 걸리는 시간이 보이는가? 이 시뮬레이터의 첫 결과는 WS에서 S사이클, OS에서 L사이클 뒤에 나온다. 마지막 MAC과 모든 결과의 완료 시각은 두 흐름 모두 \(L + 2S - 2\)사이클이다. 가중치 적재와 별도 결과 배출 시간은 포함하지 않는다. 따라서 이 모델의 PE 사용률은</p>
+    <div class="formula">$$\text{사용률} = \frac{L}{L + 2S - 2}$$</div>
     <p>이다. 흘려 보낼 길이 \(L\)(WS에서는 배치나 화소 수)이 배열 크기보다 훨씬 길어야 효율이 난다. 256×256 배열에 배치 1짜리 작은 행렬을 넣으면 PE 대부분이 논다.</p>
     <div class="predict"><strong>S = 8 배열에 L = 4짜리 일을 넣으면 사용률은?</strong>
       <p>식으로 계산하고, 시뮬레이터에서 끝까지 돌려 확인해 보자.</p>
-      <details><summary>답 보기</summary><p>\(4 / (4 + 15) \approx 21\%\)다. 배열의 79%가 채우고 비우는 데 낭비된다. 그래서 NPU 컴파일러는 작은 행렬 여러 개를 묶어 한꺼번에 흘리거나, 배열을 작은 조각으로 나눠 따로 쓰게 한다. 큰 배열이 늘 좋은 것은 아니다. 휴대폰 NPU가 거대한 배열 하나 대신 중간 크기 엔진 여러 개를 두는 이유다.</p></details>
+      <details><summary>답 보기</summary><p>\(4 / (4 + 14) \approx 22\%\)다. PE 슬롯의 약 78%가 채우고 비우는 데 낭비된다. 그래서 NPU 컴파일러는 작은 행렬 여러 개를 묶어 한꺼번에 흘리거나, 배열을 작은 조각으로 나눠 따로 쓰게 한다. 큰 배열이 늘 좋은 것은 아니다. 휴대폰 NPU가 거대한 배열 하나 대신 중간 크기 엔진 여러 개를 두는 이유다.</p></details>
     </div>
     <p>두 데이터 흐름의 차이는 <strong>무엇을 붙잡아 두느냐</strong>다. <span class="term">가중치 고정</span><span class="en">(Weight-stationary)</span>은 가중치를 PE에 한 번 싣고 수많은 입력에 재사용한다. 합성곱처럼 가중치가 여러 화소에 쓰일 때 좋다. <span class="term">출력 고정</span><span class="en">(Output-stationary)</span>은 부분합을 PE 안에 붙잡아 누적하므로 넓은(32비트) 부분합이 움직이지 않는다. 그 밖에 입력 고정, 행 고정(MIT Eyeriss) 같은 흐름도 있다. 어느 쪽이 나은지는 층의 모양에 따라 달라서, 요즘 NPU는 층마다 흐름을 바꿀 수 있게 만든다.</p>
   </section>
@@ -248,7 +248,7 @@
   <section id="sparse">
     <h2>희소성: 0은 곱하지 않는다</h2>
     <p>ReLU 뒤의 활성값은 절반 넘게 0이고, 학습이 끝난 가중치 중에도 아주 작은 값이 많다. 0을 곱하는 MAC은 결과에 아무 영향이 없으니 건너뛰면 된다. 이를 <span class="term">희소성</span><span class="en">(Sparsity)</span> 활용이라 한다. 문제는 0이 <strong>어디에</strong> 있느냐다. 0이 무작위로 흩어져 있으면 시스톨릭 배열처럼 규칙적으로 데이터를 흘리는 하드웨어는 건너뛸 방법이 없다. 0의 위치를 적어 둔 색인을 따라가며 데이터를 모아야 하는데, 그 비용이 아낀 MAC보다 크기 쉽다.</p>
-    <p>그래서 나온 타협이 <span class="term">2:4 구조적 희소성</span><span class="en">(2:4 structured sparsity)</span>이다(NVIDIA Ampere, 2020). 가중치 4개마다 정확히 2개만 남기도록 가지치기한다. 하드웨어는 남은 2개와 2비트 위치 색인만 보고 곱셈기 절반으로 같은 일을 한다. 0의 비율은 50%로 정해져 있지만 그 50%를 확실히 속도로 바꿀 수 있다.</p>
+    <p>그래서 나온 타협이 <span class="term">2:4 구조적 희소성</span><span class="en">(2:4 structured sparsity)</span>이다(NVIDIA Ampere, 2020). 가중치 4개마다 정확히 2개만 남기도록 가지치기한다. 하드웨어는 남은 2개와 비영 원소당 2비트 위치 색인(한 그룹 총 4비트 메타데이터, 대표 FP16/BF16·INT8 형식)만 보고 곱셈기 절반으로 같은 일을 한다. 네 위치 중 두 개를 고르는 패턴은 여섯 가지여서 그룹 전체를 2비트로 나타낼 수 없다(정보량 최소 3비트, 이 구현은 4비트). 다른 정밀도 형식의 묶음 규칙은 별도로 확인해야 한다. 0의 비율은 50%로 정해져 있지만 그 50%를 확실히 속도로 바꿀 수 있다.</p>
     <figure class="play" id="fig-sparse">
       <div class="play-view"><canvas id="cv-sparse"></canvas></div>
       <div class="play-ctrl">
@@ -310,7 +310,7 @@
     <ol>
       <li>신경망 계산의 대부분은 곱셈-누산(MAC)이다. 합성곱 층의 MAC = 출력 크기 × K² × C<sub>in</sub>.</li>
       <li>MAC 자체보다 데이터 이동이 훨씬 비싸다. NPU는 정수 MAC 배열과 큰 SRAM으로 재사용을 극대화한다.</li>
-      <li>시스톨릭 배열은 데이터를 엇갈려 흘려 이웃 PE끼리만 주고받는다. 사용률 ≈ L/(L+2S−1)이라 흘릴 데이터가 충분히 길어야 한다.</li>
+      <li>시스톨릭 배열은 데이터를 엇갈려 흘려 이웃 PE끼리만 주고받는다. 이 모델의 사용률 = L/(L+2S−2)이라 흘릴 데이터가 충분히 길어야 한다.</li>
       <li>루프라인: 성능 = min(최대 연산, 대역폭 × 산술 집약도). LLM 디코드(배치 1)는 극단적인 메모리 한계다.</li>
       <li>타일링은 트래픽을 1/T로, 양자화는 바이트를 절반씩, 2:4 희소성은 MAC을 절반으로 줄인다. 휴대폰 LLM 속도 ≈ 대역폭 ÷ 모델 바이트.</li>
     </ol>
@@ -352,7 +352,7 @@
           <button class="opt">0의 비율을 90%까지 높일 수 있다</button>
           <button class="opt">정확도 손실이 항상 더 작다</button>
           <button class="opt">색인 정보가 필요 없다</button>
-          <button class="opt" data-correct>네 개마다 정확히 두 개가 남아 규칙적이므로, 2비트 색인과 절반의 곱셈기로 확실히 2배 속도를 낸다</button>
+          <button class="opt" data-correct>네 개마다 정확히 두 개가 남아 규칙적이므로, 한 그룹 4비트 위치 색인과 절반의 곱셈기로 지원 엔진의 이론 MAC 처리량을 최대 2배로 높인다</button>
         </div>
         <div class="quiz-exp">규칙적인 패턴 덕분에 데이터 흐름을 바꾸지 않고 곱셈기 절반을 건너뛸 수 있다. 비율은 50%로 고정되고, 같은 비율이면 비구조적보다 정확도 손실이 약간 클 수 있다.</div></div>
     </div>
@@ -484,7 +484,7 @@
       W = []; var wr = flow === "ws" ? S : L; for (var k = 0; k < wr; k++) { W.push([]); for (var n = 0; n < S; n++) W[k].push(Math.floor(r() * 5) - 2); }
       t = 0;
     }
-    function total() { return L + 2 * S - 1; }
+    function total() { return L + 2 * S - 2; }
     function exact(m, n) { var s = 0; var K = flow === "ws" ? S : L; for (var k = 0; k < K; k++) s += A[m][k] * W[k][n]; return s; }
     // state at cycle t (after t cycles have executed: cycles 0..t-1)
     function stateAt(tt) {
@@ -585,7 +585,7 @@
     function setInfo() {
       var T = total();
       info.innerHTML = (flow === "ws" ? "<b>가중치 고정.</b> 파란 칩 = 들어오는 A 원소, 각 PE 왼쪽 위 = 붙박이 가중치, Σ = 내려가는 부분합." : "<b>출력 고정.</b> 파란 칩 = A(왼쪽에서), 주황 칩 = B(위에서). PE 가운데 숫자가 그 자리에 쌓이는 C 원소다.") +
-        " 이 크기에서 전체 " + T + "사이클, 이론 사용률 L/(L+2S−1) = " + Math.round(L / T * 100) + "%." + (flow === "ws" ? " (가중치를 미리 싣는 " + S + "사이클은 따로)" : " (결과를 빼내는 " + S + "사이클은 따로)");
+        " 이 크기에서 전체 " + T + "사이클, 이론 사용률 L/(L+2S−2) = " + Math.round(L / T * 100) + "%." + (flow === "ws" ? " (가중치를 미리 싣는 " + S + "사이클은 따로)" : " (결과를 빼내는 " + S + "사이클은 따로)");
     }
     function reset() { gen(); setInfo(); cv.redraw(); }
     SB.range("sy-s", function (v) { return v + "×" + v; }, function (v) { S = v; reset(); });
@@ -852,7 +852,7 @@
       var z = m.filter(function (x) { return !x; }).length / m.length;
       var e0 = 0, e1 = 0; Wt.forEach(function (v, i) { e0 += v * v; if (m[i]) e1 += v * v; });
       ctx.fillStyle = P.dim; ctx.font = SB.font(11); ctx.textAlign = "left"; ctx.textBaseline = "top";
-      ctx.fillText(mode === "24" ? "4개 묶음마다 큰 값 2개 + 2비트 위치 색인" : mode === "un" ? "작은 값부터 " + Math.round(ratio * 100) + "% 제거, 위치는 제각각" : "조밀 행렬", ox, oy + R * cs + 8);
+      ctx.fillText(mode === "24" ? "4개 묶음: 값 2개 + 위치 4비트" : mode === "un" ? "작은 값부터 " + Math.round(ratio * 100) + "% 제거, 위치는 제각각" : "조밀 행렬", ox, oy + R * cs + 8);
       SB.stat("sp-z", Math.round(z * 100) + "<small>%</small>");
       SB.stat("sp-keep", (e1 / e0 * 100).toFixed(1) + "<small>%</small>");
       SB.stat("sp-dense", "1.0<small>× (0도 곱함)</small>");

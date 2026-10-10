@@ -260,7 +260,7 @@
         <div class="stat"><span class="k">특성 임피던스 √(L/C)</span><span class="v" id="dr-z">—</span></div>
         <div class="stat"><span class="k">타이밍</span><span class="v" id="dr-ok" style="font-size:15px">—</span></div>
       </div>
-      <figcaption><b>그림 13-6.</b> <span class="try">만져 보기</span>위: 다이 전압(분홍)과 이 클럭을 안전하게 내는 최소 전압(점선, 0.72 V). 아래: 부하 전류(주황)와 클럭 주파수(파랑). 상승 시간이 공진 주기보다 짧으면 강하가 \(\Delta I\sqrt{L/C}\) 가까이 커진다. 적응형 클럭을 켜면 전압이 문턱 아래로 내려가는 순간 클럭을 늦춰 타이밍 오류를 막는다. 모델: 전압 조정기 0.8 V, 직렬 저항 3 mΩ, 디캡 직렬 저항 4 mΩ.</figcaption>
+      <figcaption><b>그림 13-6.</b> <span class="try">만져 보기</span>위: 다이 전압(분홍)과 공칭 클럭의 최소 동작 전압(점선, 0.72 V). 아래: 부하 전류(주황)와 클럭 주파수(파랑). 상승 시간이 공진 주기보다 짧으면 강하가 \(\Delta I\sqrt{L/C}\) 가까이 커진다. 적응형 클럭은 드룹을 감지하면 클럭을 늦춰 타이밍 여유를 회복한다. 이 모델은 최저 클럭이 공칭의 40%이므로 더 낮은 주파수가 필요한 강하는 보호 범위를 넘는다. 타이밍 판정과 붉은 구간은 실제 전압·클럭을 함께 비교한다. 점선 0.72 V는 공칭 클럭의 한계다. 모델: 전압 조정기 0.8 V, 직렬 저항 3 mΩ, 디캡 직렬 저항 4 mΩ.</figcaption>
     </figure>
     <div class="formula">$$\Delta V_{\max} \approx \Delta I\,\sqrt{\frac{L}{C}}, \qquad f_0 = \frac{1}{2\pi\sqrt{LC}}$$
       <div class="where">전류가 \(f_0\)의 주기보다 빨리 바뀔 때의 근사. 같은 \(\Delta I\)에서 강하를 줄이려면 \(L\)을 줄이거나(패키지 설계, 다이 가까이 커패시터 배치) \(C\)를 늘려야 한다(면적을 써서 디캡 셀 배치, 고밀도 MIM·딥 트렌치 커패시터).</div>
@@ -921,7 +921,8 @@
         var diL = (VR - Rser * iL - vNode) / L, dvc = (iL - il) / C;
         iL += diL * dt; vc += dvc * dt;
         if (vNode < minV) minV = vNode;
-        if (!ac && vNode < VMIN) viol += dt;
+        // Check actual frequency against the voltage-dependent timing limit in both modes.
+        if (fr > fOf(vNode) / fOf(VMIN) + 1e-12) viol += dt;
         if (fr < fmin) fmin = fr;
         if (k % every === 0) out.push([t, vNode, il, fr]);
       }
@@ -934,7 +935,13 @@
       var b1 = { x: 54, y: 22, w: w - 54 - 14, h: h * 0.55 - 22 - 16 }, b2 = { x: 54, y: h * 0.55 + 18, w: w - 54 - 14, h: h * 0.45 - 18 - 44 };
       var ylo = Math.min(0.6, Math.floor((res.minV - 0.02) * 50) / 50);
       var bands = [];
-      if (!ac) { var inV = false, s0 = 0; res.out.forEach(function (p) { if (p[1] < VMIN && !inV) { inV = true; s0 = p[0]; } else if (p[1] >= VMIN && inV) { inV = false; bands.push({ x0: s0, x1: p[0], color: SOC.alpha(P.bad, 0.18) }); } }); if (inV) bands.push({ x0: s0, x1: TT, color: SOC.alpha(P.bad, 0.18) }); }
+      var inV = false, s0 = 0;
+      res.out.forEach(function (p) {
+        var bad = p[3] > fOf(p[1]) / fOf(VMIN) + 1e-12;
+        if (bad && !inV) { inV = true; s0 = p[0]; }
+        else if (!bad && inV) { inV = false; bands.push({ x0: s0, x1: p[0], color: SOC.alpha(P.bad, 0.18) }); }
+      });
+      if (inV) bands.push({ x0: s0, x1: TT, color: SOC.alpha(P.bad, 0.18) });
       SB.chart(ctx, b1, {
         x: [0, TT], y: [ylo, 0.82], yFmt: function (v) { return v.toFixed(2); },
         series: [{ data: res.out.map(function (p) { return [p[0], p[1]]; }), color: P.accent, width: 2.2 }],
@@ -953,7 +960,11 @@
       SB.stat("dr-max", ((res.v0 - res.minV) * 1000).toFixed(0) + "<small>mV</small>");
       SB.stat("dr-f0", (1 / (2 * Math.PI * Math.sqrt(L * C)) / 1e6).toFixed(0) + "<small>MHz</small>");
       SB.stat("dr-z", (Math.sqrt(L / C) * 1000).toFixed(1) + "<small>mΩ</small>");
-      SB.stat("dr-ok", ac ? (res.fmin < 0.999 ? '<span style="color:var(--warn)">안전 (클럭 최저 ' + Math.round(res.fmin * 100) + "%)</span>" : '<span style="color:var(--ok)">안전</span>') : res.viol > 0 ? '<span style="color:var(--bad)">위반 ' + (res.viol * 1e9).toFixed(1) + " ns</span>" : '<span style="color:var(--ok)">안전</span>');
+      SB.stat("dr-ok", res.viol > 0
+        ? '<span style="color:var(--bad)">' + (ac ? "보호 범위 초과 · " : "") + "위반 " + (res.viol * 1e9).toFixed(1) + " ns</span>"
+        : ac && res.fmin < 0.999
+          ? '<span style="color:var(--warn)">안전 (클럭 최저 ' + Math.round(res.fmin * 100) + "%)</span>"
+          : '<span style="color:var(--ok)">안전</span>');
       cv.redraw();
     }
     SB.range("dr-i", function (v) { return v.toFixed(1) + " A"; }, function (v) { dI = v; upd(); });

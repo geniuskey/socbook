@@ -92,7 +92,7 @@
         <thead><tr><th>채널</th><th>방향</th><th>싣는 것</th></tr></thead>
         <tbody>
           <tr><td><b>AR</b> (Read Address)</td><td>마스터 → 슬레이브</td><td>읽을 주소, 버스트 길이, ID</td></tr>
-          <tr><td><b>R</b> (Read Data)</td><td>슬레이브 → 마스터</td><td>읽은 데이터 비트(beat)들, ID, 마지막 표시(RLAST)</td></tr>
+          <tr><td><b>R</b> (Read Data)</td><td>슬레이브 → 마스터</td><td>읽은 데이터 전송(beat)들, ID, 마지막 표시(RLAST)</td></tr>
           <tr><td><b>AW</b> (Write Address)</td><td>마스터 → 슬레이브</td><td>쓸 주소, 버스트 길이, ID</td></tr>
           <tr><td><b>W</b> (Write Data)</td><td>마스터 → 슬레이브</td><td>쓸 데이터와 바이트 마스크(WSTRB)</td></tr>
           <tr><td><b>B</b> (Write Response)</td><td>슬레이브 → 마스터</td><td>쓰기 완료 응답(OK/오류)</td></tr>
@@ -101,7 +101,7 @@
     </div>
     <p>채널이 나뉘어 있으니 읽기와 쓰기가 서로를 기다리지 않고 동시에 흐른다. 여기에 세 가지 장치가 더해져 대역폭을 끌어올린다.</p>
     <ul>
-      <li><span class="term">버스트</span><span class="en">(Burst)</span>: 주소 한 번으로 연속된 데이터 여러 비트(최대 256)를 받는다. 캐시 라인 64 B를 128비트 버스로 읽으면 주소 1번, 데이터 4비트다.</li>
+      <li><span class="term">버스트</span><span class="en">(Burst)</span>: 주소 한 번으로 연속된 데이터를 여러 회 전송받는다(AXI4 INCR 최대 256 beats). 캐시 라인 64 B를 128비트 버스로 읽으면 주소 1번, 데이터 4 beats다(16 B × 4 = 64 B = 512 bits).</li>
       <li><span class="term">다중 미결 트랜잭션</span><span class="en">(Multiple outstanding transactions)</span>: 첫 요청의 데이터가 오기 전에 다음 주소를 계속 보낸다. DRAM처럼 지연이 긴 상대일수록 중요하다.</li>
       <li><span class="term">트랜잭션 ID</span>: 같은 ID끼리는 응답이 요청 순서대로 와야 하지만, ID가 다르면 <b>먼저 준비된 것부터</b> 돌려줄 수 있다(순서 뒤바뀜, out-of-order).</li>
     </ul>
@@ -112,7 +112,7 @@
         <div class="sim-view"><canvas id="cv-axi"></canvas></div>
         <div class="sim-controls">
           <label class="ctrl"><span>미결 트랜잭션 한도 <output id="ax-o-out"></output></span><input type="range" id="ax-o" min="1" max="8" step="1" value="1"></label>
-          <label class="ctrl"><span>버스트 길이 (비트) <output id="ax-l-out"></output></span><input type="range" id="ax-l" min="1" max="8" step="1" value="4"></label>
+          <label class="ctrl"><span>버스트 길이 (beats) <output id="ax-l-out"></output></span><input type="range" id="ax-l" min="1" max="8" step="1" value="4"></label>
           <div class="ctrl"><span>요청 대상</span><div class="seg" id="ax-tg"><button data-value="mix" class="on">SRAM·DRAM 번갈아</button><button data-value="dram">모두 DRAM</button><button data-value="rnd">무작위</button></div></div>
           <div class="ctrl"><span>ID 붙이기</span><div class="seg" id="ax-id"><button data-value="same" class="on">모두 같은 ID</button><button data-value="diff">대상별 다른 ID</button></div></div>
           <label class="check"><input type="checkbox" id="ax-w"> 쓰기 트랜잭션도 섞기 (AW·W·B)</label>
@@ -124,11 +124,11 @@
         <div class="stat"><span class="k">64클럭 동안 끝낸 읽기</span><span class="v" id="ax-done">—</span></div>
         <div class="stat"><span class="k">순서 뒤바뀐 응답</span><span class="v" id="ax-ooo">—</span></div>
       </div>
-      <div class="sim-note">각 칸은 한 클럭이다. 위 다섯 줄은 채널, 아래 줄들은 트랜잭션 하나하나의 수명(주소를 보낸 때부터 마지막 데이터까지)이다. 막대 색이 같으면 같은 트랜잭션이다. <b>S</b>는 SRAM, <b>D</b>는 DRAM 대상이며, 옅은 칸은 슬레이브가 데이터를 준비 중인 시간, 진한 칸은 R 채널을 타는 시간이다. 단순화를 위해 한 트랜잭션의 비트들은 끊기지 않고 연속으로 보낸다고 가정했다.</div>
+      <div class="sim-note">각 칸은 한 클럭이다. 위 다섯 줄은 채널, 아래 줄들은 트랜잭션 하나하나의 수명(주소를 보낸 때부터 마지막 데이터까지)이다. 막대 색이 같으면 같은 트랜잭션이다. <b>S</b>는 SRAM, <b>D</b>는 DRAM 대상이며, 옅은 칸은 슬레이브가 데이터를 준비 중인 시간, 진한 칸은 R 채널을 타는 시간이다. 단순화를 위해 한 트랜잭션의 데이터 전송(beat)들은 끊기지 않고 연속으로 보낸다고 가정했다.</div>
     </div>
     <div class="predict"><strong>미결 한도 1에서 8로 올리면 R 채널 사용률은 어떻게 될까? 그런데 "모두 같은 ID"라면?</strong>
       <p>DRAM 요청 뒤에 SRAM 요청이 줄 서 있는 상황을 떠올려 보자.</p>
-      <details><summary>답 보기</summary><p>한도 1이면 요청 하나의 지연(DRAM 20클럭) 동안 R 채널이 놀아서 사용률이 20% 남짓에 그친다. 한도를 올리면 여러 요청의 지연이 겹쳐 숨겨지므로 사용률이 크게 오른다. 그러나 ID가 모두 같으면 SRAM 데이터가 3클럭 만에 준비되어도 앞선 DRAM 응답이 끝날 때까지 기다려야 한다(<b>머리 막힘</b>). ID를 대상별로 나누면 SRAM 응답이 DRAM 응답을 앞질러 오고, 평균 지연이 줄어든다. 일반적으로 필요한 미결 수는 <b>지연 × 대역폭</b>(리틀의 법칙)으로 정해진다. 지연 20클럭 동안 R 채널을 꽉 채우려면 비트 20개가 날아다니고 있어야 한다.</p></details>
+      <details><summary>답 보기</summary><p>한도 1이면 요청 하나의 지연(DRAM 20클럭) 동안 R 채널이 놀아서 사용률이 20% 남짓에 그친다. 한도를 올리면 여러 요청의 지연이 겹쳐 숨겨지므로 사용률이 크게 오른다. 그러나 ID가 모두 같으면 SRAM 데이터가 3클럭 만에 준비되어도 앞선 DRAM 응답이 끝날 때까지 기다려야 한다(<b>머리 막힘</b>). ID를 대상별로 나누면 SRAM 응답이 DRAM 응답을 앞질러 오고, 평균 지연이 줄어든다. 일반적으로 필요한 미결 수는 <b>지연 × 대역폭</b>(리틀의 법칙)으로 정해진다. 지연 20클럭 동안 R 채널을 꽉 채우려면 데이터 전송 20 beats가 날아다니고 있어야 한다.</p></details>
     </div>
     <div class="formula">$$ N_{\text{outstanding}} \;\ge\; \frac{\text{지연} \times \text{대역폭}}{\text{트랜잭션당 바이트}} $$
       <div class="where">리틀의 법칙<span class="en">(Little's law)</span>. 예: DRAM 왕복 지연 100 ns, 목표 대역폭 25.6 GB/s, 64 B 캐시 라인이면 \(100\,\text{ns}\times 25.6\,\text{GB/s} / 64\,\text{B} = 40\)개의 요청이 늘 날아다녀야 한다. 그래서 CPU 클러스터와 GPU는 수십~수백 개의 미결 요청을 추적하는 버퍼를 갖는다(<a href="cache.html">5장</a>의 MSHR, <a href="dram.html">7장</a>).</div>
@@ -534,7 +534,7 @@
       SB.stat("ax-ooo", r.ooo + "<small>개</small>");
     }, { aspect: 0.52, minHeight: 300, maxHeight: 400 });
     SB.range("ax-o", function (v) { return v + "개"; }, function (v) { O = v; cv.redraw(); });
-    SB.range("ax-l", function (v) { return v + "비트"; }, function (v) { L = v; cv.redraw(); });
+    SB.range("ax-l", function (v) { return v + " beats"; }, function (v) { L = v; cv.redraw(); });
     SB.seg("ax-tg", function (v) { tg = v; cv.redraw(); });
     SB.seg("ax-id", function (v) { idm = v; cv.redraw(); });
     document.getElementById("ax-w").addEventListener("change", function (e) { wr = e.target.checked; cv.redraw(); });

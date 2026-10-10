@@ -281,7 +281,7 @@
         </tbody>
       </table>
     </div>
-    <div class="callout deep"><strong>왜 약한 모델을 택하나</strong><p>약한 모델은 하드웨어에 자유를 준다. 캐시 미스가 난 쓰기를 기다리지 않고 뒤의 쓰기를 먼저 내보내고, 비순차 코어(<a href="ooo.html">4장</a>)가 읽기를 마음껏 앞당길 수 있다. 대가는 프로그래밍의 어려움이다. 다행히 C/C++11·자바·러스트의 원자 변수(<code>std::atomic</code>와 memory_order)를 쓰면 컴파일러가 대상 CPU에 맞는 펜스를 넣어 준다. 데이터 경쟁이 없는 프로그램은 SC처럼 동작한다는 보장(SC-for-DRF)이 이 언어 모델들의 핵심이다.</p></div>
+    <div class="callout deep"><strong>왜 약한 모델을 택하나</strong><p>약한 모델은 하드웨어에 자유를 준다. 캐시 미스가 난 쓰기를 기다리지 않고 뒤의 쓰기를 먼저 내보내고, 비순차 코어(<a href="ooo.html">4장</a>)가 읽기를 마음껏 앞당길 수 있다. 대가는 프로그래밍의 어려움이다. C/C++의 <code>std::atomic</code>은 원자 접근을 제공하지만 순서는 <code>memory_order</code>에 따라 다르고, 항상 별도 펜스가 필요한 것도 아니다. SC-for-DRF는 적절한 mutex·seq_cst 접근으로 동기화한 데이터 경쟁 없는 프로그램 등의 조건에서 읽어야 한다. relaxed 또는 acquire/release 원자는 데이터 경쟁이 없어도 SC에 없는 결과를 허용할 수 있다. 예를 들어 두 스레드가 각자 release store 뒤 상대 변수의 acquire load를 하면 둘 다 초기 0을 읽을 수 있다.</p></div>
   </section>
 
   <!-- ============================================================ 7 -->

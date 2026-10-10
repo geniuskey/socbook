@@ -104,8 +104,8 @@
       </div>
       <div class="sim-note">기준 클럭 38.4 MHz. N을 바꾸면 PLL이 이전 주파수에서 새 주파수로 옮겨 가며 다시 잠기는 과정을 그린다(가로축 µs). 위쪽 그림은 블록도와 지금 순간의 값, 아래 그래프의 연한 곡선은 위상 오차다. 모델은 PFD를 기준 클럭마다 표본화하는 이산 시간 2차 PI 루프이며, 위상 차가 한 주기를 넘으면 PFD가 주기를 건너뛴다(사이클 슬립). <b>대역폭을 넓히면</b> 빨리 잠기고 VCO 잡음을 잘 눌러 주지만, 기준 클럭의 지터(×N)는 그대로 통과시킨다. 두 잡음이 같을 때 지터가 가장 작은 최적 대역폭이 있다. 실제 PLL은 대역폭을 수백 kHz 안팎으로 좁게 두고, 잠그기 전에 VCO의 대역을 고르는 교정 단계를 거치므로 잠금에 수십 µs가 걸린다.</div>
     </div>
-    <div class="formula">$$ f_{\text{out}} = \frac{N}{M}\,f_{\text{ref}}, \qquad \omega_n = \sqrt{\frac{K_{\text{VCO}} I_{\text{CP}}}{2\pi N C}}, \qquad \zeta = \frac{R}{2}\sqrt{\frac{K_{\text{VCO}} I_{\text{CP}} C}{2\pi N}} $$
-      <div class="where">\(M\): 기준 분주비, \(K_{\text{VCO}}\): VCO 이득(Hz/V), \(I_{\text{CP}}\): 전하 펌프 전류, \(R, C\): 루프 필터. 안정성을 위해 루프 대역폭은 보통 기준 주파수의 1/10 이하로 잡는다(Gardner의 한계). N을 소수로 바꿔 가며(시그마-델타 변조) 아주 촘촘한 주파수를 만드는 것을 <b>분수 분주 PLL</b><span class="en">(Fractional-N PLL)</span>이라 하며, DVFS로 CPU 클럭을 수십 MHz 단위로 바꾸는 데 쓴다(<a href="power.html">12장</a>).</div>
+    <div class="formula">$$ f_{\text{out}} = \frac{N}{M}\,f_{\text{ref}}, \qquad \omega_n = \sqrt{\frac{K_{\text{VCO}} I_{\text{CP}}}{N C}}, \qquad \zeta = \frac{R}{2}\sqrt{\frac{K_{\text{VCO}} I_{\text{CP}} C}{N}} $$
+      <div class="where">\(M\): 기준 분주비, \(K_{\text{VCO}}\): VCO 이득(Hz/V), \(I_{\text{CP}}\): 전하 펌프 전류, \(R, C\): 단순 직렬 RC의 2차 루프 필터 모형(추가 극점은 제외). Hz/V의 VCO 이득을 위상 이득으로 바꾸는 2π와 전하 펌프 A/rad의 2π가 상쇄된다. 안정성을 위해 루프 대역폭은 보통 기준 주파수의 1/10 이하로 잡는다(Gardner의 한계). N을 소수로 바꿔 가며(시그마-델타 변조) 아주 촘촘한 주파수를 만드는 것을 <b>분수 분주 PLL</b><span class="en">(Fractional-N PLL)</span>이라 하며, DVFS로 CPU 클럭을 수십 MHz 단위로 바꾸는 데 쓴다(<a href="power.html">12장</a>).</div>
     </div>
     <div class="predict"><strong>ζ를 0.2로 낮추면 잠금 시간은 줄어들까?</strong>
       <p>감쇠가 작으면 반응이 날카로워진다. 그런데 "±0.1% 안에 들어와 머문다"는 조건을 생각해 보자.</p>

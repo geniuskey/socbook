@@ -246,7 +246,7 @@
         <div class="stat"><span class="k">유효 리프레시 간격</span><span class="v" id="rf-refi">—</span></div>
         <div class="stat"><span class="k">요청이 막히는 시간 비율</span><span class="v" id="rf-ov">—</span></div>
       </div>
-      <figcaption><b>그림 7-5.</b> <span class="try">만져 보기</span>tRFC 값은 LPDDR5 계열 규격의 대략값이다(4 Gb 약 130 ns, 8 Gb 약 210 ns, 16 Gb 약 280 ns, 32 Gb 약 380 ns). tREFI ≈ 3.9 µs를 85°C 초과에서 1/2, 95°C 초과에서 1/4로 줄였다. 뱅크별 리프레시는 한 번에 뱅크 하나만 약 절반의 시간 동안 막으므로, 무작위 요청이 막힐 확률이 전 뱅크 방식의 수십분의 1이다.</figcaption>
+      <figcaption><b>그림 7-5.</b> <span class="try">만져 보기</span>tRFC 값은 LPDDR5 계열 규격의 대략값이다(4 Gb 약 130 ns, 8 Gb 약 210 ns, 16 Gb 약 280 ns, 32 Gb 약 380 ns). tREFI ≈ 3.9 µs를 85°C 초과에서 1/2, 95°C 초과에서 1/4로 줄였다. 뱅크별 리프레시는 한 번에 뱅크 하나만 약 절반의 시간 동안 막으므로, 이 모형에서 균일한 무작위 요청의 시간 평균 막힘 비율은 전 뱅크 방식의 약 절반이다. 명령은 tREFI/16마다 오지만 목표 뱅크의 재방문 간격은 tREFI이므로 비율은 tRFCpb/tREFI다.</figcaption>
     </figure>
   </section>
 
@@ -833,7 +833,7 @@
   (function () {
     var DEN = [4, 8, 12, 16, 24, 32], RFC = [130, 210, 280, 280, 380, 380], di = 3, T = 45, mode = "ab";
     function mult(t) { return t > 95 ? 4 : t > 85 ? 2 : 1; }
-    function ov(i, t, m) { var refi = 3906 / mult(t), rfc = m === "pb" ? RFC[i] / 2 : RFC[i]; var f = rfc / refi; return m === "pb" ? f / 16 * 1 : f; }
+    function ov(i, t, m) { var refi = 3906 / mult(t), rfc = m === "pb" ? RFC[i] / 2 : RFC[i]; var f = rfc / refi; return f; }
     var cv = SB.canvas("#cv-ref", function (ctx, w, h) {
       var temps = [[45, "≤85°C"], [90, "85~95°C"], [100, "95~105°C"]], cols = [P.ok, P.warn, P.bad];
       var series = temps.map(function (tp, k) { return { data: DEN.map(function (d, i) { return [d, ov(i, tp[0], "ab") * 100]; }), color: cols[k], width: 2 }; });
